@@ -1,0 +1,38 @@
+services:
+  backend:
+    # Built locally by default; set BACKEND_IMAGE to a registry ref to pull a prebuilt image.
+    image: ${BACKEND_IMAGE:-meeting-notes-agent-backend:latest}
+    build:
+      context: ./backend
+      args:
+        WHISPER_MODEL: base        # tiny | base | small | medium | large-v3
+        GGML_NATIVE: "OFF"         # OFF = portable image; ON = faster, host-CPU-tuned
+    environment:
+      ENABLE_LAB: "false"          # keep the Testing Lab out of the deployed app
+      # LM Studio runs on the host machine; reach it via host.docker.internal.
+      LM_STUDIO_BASE_URL: "http://host.docker.internal:1234/v1"
+      LM_STUDIO_MODEL: ""          # name of the model loaded in LM Studio
+      LM_STUDIO_MAX_TOKENS: "40960"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # required on Linux, harmless on macOS/Windows
+    volumes:
+      - app-data:/data             # notes.db + uploaded audio persist here
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-meeting-notes-agent-frontend:latest}
+    build:
+      context: ./frontend
+      args:
+        VITE_ENABLE_LAB: "false"
+    ports:
+      - "8080:80"                  # open http://localhost:8080
+    depends_on:
+      - backend
+
+volumes:
+  app-data:
