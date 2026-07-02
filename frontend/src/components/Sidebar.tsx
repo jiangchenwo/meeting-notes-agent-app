@@ -53,7 +53,9 @@ export default function Sidebar() {
 
       <div className="border-t border-outline-variant pt-space-4 mt-space-4 space-y-1">
         <a
-          href="#"
+          href="https://github.com/jiangchenwo/meeting-notes-agent-app"
+          target="_blank"
+          rel="noopener noreferrer"
           className="text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-all flex items-center gap-space-3 px-space-4 py-space-2 rounded-DEFAULT"
         >
           <span className="material-symbols-outlined text-[20px]">help</span>
