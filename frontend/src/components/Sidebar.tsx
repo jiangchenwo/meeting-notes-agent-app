@@ -1,13 +1,9 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 
-// Testing Lab is dev-only; excluded from production builds via VITE_ENABLE_LAB=false.
-const LAB_ENABLED = import.meta.env.VITE_ENABLE_LAB !== 'false';
-
 const navItems = [
   { to: '/', icon: 'home', label: 'Main Page', exact: true },
   { to: '/projects', icon: 'folder', label: 'Projects' },
   { to: '/management', icon: 'dashboard_customize', label: 'Templates' },
-  ...(LAB_ENABLED ? [{ to: '/lab', icon: 'science', label: 'Testing Lab' }] : []),
   { to: '/settings', icon: 'settings', label: 'Settings' },
   { to: '/archive', icon: 'archive', label: 'Archive' },
 ];

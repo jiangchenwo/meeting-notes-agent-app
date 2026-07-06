@@ -1,8 +1,0 @@
-{
-  "dataset": "mit-ocw",
-  "domain": "Education",
-  "course": "8-01sc-classical-mechanics-fall-2016",
-  "topic": "physics_bio",
-  "transcript": "Let's consider the motion of an object that is under the action of a force. So we have some force that's acting on this object. And we have a little displacement ds. So this is a small displacement of the object. Then we know that the small amount of work done by the action of this force is F.ds. And the rate of doing work, so let's now introduce the concept of power, which is the rate of doing work. That is, F.ds over dt. And ds dt is just the velocity of the object. So we see very simply that when we talk about power, and sometimes people use the symbol p, although we can also talk about pressure and momentum, so it's a little bit tricky. But here, the power is F.v. And power is a concept that will appear in many different settings. ",
-  "summary": ""
-}

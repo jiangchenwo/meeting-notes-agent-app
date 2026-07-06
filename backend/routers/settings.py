@@ -10,7 +10,7 @@ from database import get_db
 from models import Domain, Template, Project
 from seed import sync_builtin_domains_and_templates
 import lm_config
-import whisper_config
+import asr_config
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -105,26 +105,38 @@ def lm_studio_status():
     return {"connected": False, "models": []}
 
 
-class WhisperConfigUpdate(BaseModel):
-    binary_path: Optional[str] = None
-    model: Optional[str] = None
-    model_path: Optional[str] = None
+class ASRConfigUpdate(BaseModel):
+    base_url: Optional[str] = None
 
 
-@router.get("/whisper")
-def get_whisper_config():
-    cfg = whisper_config.load()
-    return {**cfg, "available_models": whisper_config.WHISPER_MODELS}
+@router.get("/asr")
+def get_asr_config():
+    return asr_config.load()
 
 
-@router.put("/whisper")
-def update_whisper_config(payload: WhisperConfigUpdate):
-    cfg = whisper_config.load()
-    if payload.binary_path is not None:
-        cfg["binary_path"] = payload.binary_path.strip()
-    if payload.model is not None:
-        cfg["model"] = payload.model.strip()
-    if payload.model_path is not None:
-        cfg["model_path"] = payload.model_path.strip()
-    whisper_config.save(cfg)
-    return {**cfg, "available_models": whisper_config.WHISPER_MODELS}
+@router.put("/asr")
+def update_asr_config(payload: ASRConfigUpdate):
+    cfg = asr_config.load()
+    if payload.base_url is not None:
+        cfg["base_url"] = payload.base_url.strip()
+    asr_config.save(cfg)
+    return cfg
+
+
+@router.get("/asr/status")
+def asr_status():
+    configured_url = asr_config.load()["base_url"]
+    base_url = configured_url.rstrip("/")
+    try:
+        with httpx.Client(timeout=3) as client:
+            resp = client.get(f"{base_url}/health")
+            if resp.status_code == 200:
+                data = resp.json()
+                return {
+                    "base_url": configured_url,
+                    "connected": True,
+                    "models_loaded": bool(data.get("models_loaded", False)),
+                }
+    except Exception:
+        pass
+    return {"base_url": configured_url, "connected": False, "models_loaded": False}

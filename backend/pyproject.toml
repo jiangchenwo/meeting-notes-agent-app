@@ -15,10 +15,4 @@ dependencies = [
 [dependency-groups]
 test = [
     "pytest>=8.0.0",
-    "rouge-score>=0.1.2",
-    "bert-score>=0.3.13",
-    "pandas>=2.0.0",
-    "ipykernel>=6.0.0",
-    "datasets>=2.20.0",
-    "requests>=2.31.0",
 ]

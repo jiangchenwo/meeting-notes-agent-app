@@ -1,5 +1,5 @@
 import { apiFetch } from './client';
-import type { Summary, LMStudioStatus, LMConfig, WhisperConfig, ActionItem } from './types';
+import type { Summary, LMStudioStatus, LMConfig, AsrStatus, AsrConfig, ActionItem } from './types';
 
 export const startSummarization = (noteId: number) =>
   apiFetch<{ status: string }>(`/notes/${noteId}/summarize`, { method: 'POST' });
@@ -27,11 +27,14 @@ export const updateLMConfig = (cfg: Partial<LMConfig>) =>
     body: JSON.stringify(cfg),
   });
 
-export const getWhisperConfig = () =>
-  apiFetch<WhisperConfig>('/settings/whisper');
+export const getAsrStatus = () =>
+  apiFetch<AsrStatus>('/settings/asr/status');
 
-export const updateWhisperConfig = (cfg: Partial<Pick<WhisperConfig, 'binary_path' | 'model' | 'model_path'>>) =>
-  apiFetch<WhisperConfig>('/settings/whisper', {
+export const getAsrConfig = () =>
+  apiFetch<AsrConfig>('/settings/asr');
+
+export const updateAsrConfig = (cfg: Partial<AsrConfig>) =>
+  apiFetch<AsrConfig>('/settings/asr', {
     method: 'PUT',
     body: JSON.stringify(cfg),
   });

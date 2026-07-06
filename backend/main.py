@@ -3,12 +3,17 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
+import storage
 from audio_utils import probe_duration_ms
 from database import engine, SessionLocal
 from models import Base, NoteBlock
 from routers import domains, notes, projects, uploads
 from routers import transcribe, settings, summarize, export, workflow
 from seed import seed
+
+# Create the storage subdirs and migrate any legacy flat files into them
+# (db/, uploads/, config/) before the database is opened below.
+storage.ensure_and_migrate()
 
 Base.metadata.create_all(bind=engine)
 
@@ -92,11 +97,6 @@ app.include_router(domains.router)
 app.include_router(settings.router)
 app.include_router(summarize.router)
 app.include_router(workflow.router)
-
-# Testing Lab (eval datasets + metrics): optional, excluded from production builds.
-if os.getenv("ENABLE_LAB", "true").lower() == "true":
-    from routers import lab
-    app.include_router(lab.router)
 
 _BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 _UPLOADS_DIR = os.getenv("UPLOAD_DIR", os.path.join(_BACKEND_DIR, "uploads"))

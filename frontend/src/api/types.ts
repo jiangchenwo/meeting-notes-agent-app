@@ -50,6 +50,7 @@ export interface TranscriptionSegment {
   start: number;
   end: number;
   text: string;
+  speaker?: string | null;
 }
 
 export interface Transcription {
@@ -58,6 +59,7 @@ export interface Transcription {
   segments: TranscriptionSegment[];
   model_used: string | null;
   language: string | null;
+  diarized?: boolean;
 }
 
 export interface Project {
@@ -73,6 +75,14 @@ export interface Project {
   total_size: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface ProjectSpeaker {
+  id: number;
+  project_id: number;
+  name: string;
+  color: string | null;
+  created_at: string;
 }
 
 export interface ActionItem {
@@ -103,16 +113,12 @@ export interface LMConfig {
   global_system_prompt: string;
 }
 
-export interface WhisperModelInfo {
-  name: string;
-  size: string;
-  speed: string;
-  quality: string;
+export interface AsrStatus {
+  base_url: string;
+  connected: boolean;
+  models_loaded: boolean;
 }
 
-export interface WhisperConfig {
-  binary_path: string;
-  model: string;
-  model_path: string;
-  available_models: WhisperModelInfo[];
+export interface AsrConfig {
+  base_url: string;
 }

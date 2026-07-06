@@ -1,7 +1,6 @@
-import json
-import os
+from config_store import load_json, save_json
 
-_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "lm_config.json")
+_CONFIG_NAME = "lm_config.json"
 
 
 DEFAULT_SYSTEM_PROMPT = (
@@ -16,25 +15,21 @@ DEFAULT_SYSTEM_PROMPT = (
     "Keep the tone concise, professional, and action-oriented."
 )
 
+# Defaults target the Docker deployment, where LM Studio runs on the host and is
+# reached via host.docker.internal. Everything here is editable from the
+# frontend Settings page and persisted via config_store.
+DEFAULTS = {
+    "base_url": "http://host.docker.internal:1234/v1",
+    "model": "",
+    "max_tokens": 40960,
+    "max_response_tokens": 2048,
+    "global_system_prompt": DEFAULT_SYSTEM_PROMPT,
+}
+
 
 def load() -> dict:
-    defaults = {
-        "base_url": os.getenv("LM_STUDIO_BASE_URL", "http://localhost:1234/v1"),
-        "model": os.getenv("LM_STUDIO_MODEL", ""),
-        "max_tokens": int(os.getenv("LM_STUDIO_MAX_TOKENS", "4096")),
-        "max_response_tokens": int(os.getenv("LM_STUDIO_MAX_RESPONSE_TOKENS", "2048")),
-        "global_system_prompt": DEFAULT_SYSTEM_PROMPT,
-    }
-    if os.path.isfile(_CONFIG_PATH):
-        try:
-            with open(_CONFIG_PATH) as f:
-                saved = json.load(f)
-            defaults.update(saved)
-        except Exception:
-            pass
-    return defaults
+    return load_json(_CONFIG_NAME, DEFAULTS)
 
 
 def save(data: dict) -> None:
-    with open(_CONFIG_PATH, "w") as f:
-        json.dump(data, f, indent=2)
+    save_json(_CONFIG_NAME, data)

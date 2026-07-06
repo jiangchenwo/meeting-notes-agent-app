@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '../api/client';
 import Select from '../components/Select';
-import { getLMConfig, updateLMConfig, getLMStudioStatus, getWhisperConfig, updateWhisperConfig } from '../api/summarize';
-import type { LMConfig, LMStudioStatus, WhisperConfig } from '../api/types';
+import { getLMConfig, updateLMConfig, getLMStudioStatus, getAsrStatus, getAsrConfig, updateAsrConfig } from '../api/summarize';
+import type { LMConfig, LMStudioStatus, AsrStatus, AsrConfig } from '../api/types';
 
 type RestoreResult = { ok: boolean; restored: { domains: number; templates: number } };
 
@@ -16,14 +16,17 @@ export default function Settings() {
   const [lmSaveMsg, setLmSaveMsg] = useState<string | null>(null);
   const [lmTesting, setLmTesting] = useState(false);
 
-  const [whisperConfig, setWhisperConfig] = useState<WhisperConfig>({ binary_path: '', model: 'base', model_path: '', available_models: [] });
-  const [whisperSaving, setWhisperSaving] = useState(false);
-  const [whisperSaveMsg, setWhisperSaveMsg] = useState<string | null>(null);
+  const [asrStatus, setAsrStatus] = useState<AsrStatus | null>(null);
+  const [asrTesting, setAsrTesting] = useState(false);
+  const [asrConfig, setAsrConfig] = useState<AsrConfig>({ base_url: '' });
+  const [asrSaving, setAsrSaving] = useState(false);
+  const [asrSaveMsg, setAsrSaveMsg] = useState<string | null>(null);
 
   useEffect(() => {
     getLMConfig().then(setLmConfig).catch(() => {});
     getLMStudioStatus().then(setLmStatus).catch(() => setLmStatus({ connected: false, models: [] }));
-    getWhisperConfig().then(setWhisperConfig).catch(() => {});
+    getAsrConfig().then(setAsrConfig).catch(() => {});
+    getAsrStatus().then(setAsrStatus).catch(() => setAsrStatus(null));
   }, []);
 
   const handleBackup = () => {
@@ -77,21 +80,31 @@ export default function Settings() {
     }
   };
 
-  const handleSaveWhisper = async () => {
-    setWhisperSaving(true);
-    setWhisperSaveMsg(null);
+  const handleSaveAsrConfig = async () => {
+    setAsrSaving(true);
+    setAsrSaveMsg(null);
     try {
-      const saved = await updateWhisperConfig({
-        binary_path: whisperConfig.binary_path,
-        model: whisperConfig.model,
-        model_path: whisperConfig.model_path,
-      });
-      setWhisperConfig(saved);
-      setWhisperSaveMsg('Saved.');
+      const saved = await updateAsrConfig(asrConfig);
+      setAsrConfig(saved);
+      setAsrSaveMsg('Saved.');
+      // Re-check connectivity against the newly saved URL.
+      getAsrStatus().then(setAsrStatus).catch(() => setAsrStatus(null));
     } catch {
-      setWhisperSaveMsg('Save failed.');
+      setAsrSaveMsg('Save failed.');
     } finally {
-      setWhisperSaving(false);
+      setAsrSaving(false);
+    }
+  };
+
+  const handleTestAsr = async () => {
+    setAsrTesting(true);
+    try {
+      const status = await getAsrStatus();
+      setAsrStatus(status);
+    } catch {
+      setAsrStatus(null);
+    } finally {
+      setAsrTesting(false);
     }
   };
 
@@ -110,94 +123,84 @@ export default function Settings() {
 
       <div className="flex-1 px-margin-mobile md:px-margin-desktop py-space-6 max-w-container-max mx-auto w-full space-y-space-6 max-w-xl">
 
-        {/* Whisper (Transcription) */}
+        {/* ASR Service */}
         <section className="bg-surface-container-lowest rounded-xl overflow-hidden">
-          <div className="px-space-6 py-space-4 border-b border-outline-variant">
-            <h3 className="font-headline-md text-headline-md text-on-surface flex items-center gap-2">
-              <span className="material-symbols-outlined text-[20px] text-primary">mic</span>
-              Whisper Transcription
-            </h3>
-            <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
-              Configure the whisper.cpp binary and model for transcription.
-            </p>
+          <div className="px-space-6 py-space-4 border-b border-outline-variant flex items-center justify-between">
+            <div>
+              <h3 className="font-headline-md text-headline-md text-on-surface flex items-center gap-2">
+                <span className="material-symbols-outlined text-[20px] text-primary">mic</span>
+                ASR Service
+              </h3>
+              <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
+                Host-native transcription &amp; speaker diarization (Metal). Start it separately from the app.
+              </p>
+            </div>
+            {asrStatus && (
+              <span className={`flex items-center gap-1.5 font-label-sm text-label-sm px-2.5 py-1 rounded-full border ${
+                asrStatus.connected
+                  ? 'bg-primary/10 text-primary border-primary/20'
+                  : 'bg-error/10 text-error border-error/20'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${asrStatus.connected ? 'bg-primary' : 'bg-error'}`} />
+                {asrStatus.connected ? 'Connected' : 'Unreachable'}
+              </span>
+            )}
           </div>
 
           <div className="p-space-6 space-y-space-4">
             <div className="flex flex-col gap-space-1">
-              <label className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Whisper Binary Path</label>
+              <label className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Service URL</label>
               <input
                 type="text"
                 className="px-space-3 py-2 rounded border border-outline-variant bg-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none font-body-md text-body-md text-on-surface transition-all"
-                placeholder="/path/to/whisper.cpp/build/bin"
-                value={whisperConfig.binary_path}
-                onChange={(e) => setWhisperConfig((c) => ({ ...c, binary_path: e.target.value }))}
+                placeholder="http://host.docker.internal:9000"
+                value={asrConfig.base_url}
+                onChange={(e) => setAsrConfig((c) => ({ ...c, base_url: e.target.value }))}
               />
               <p className="font-body-sm text-body-sm text-on-surface-variant">
-                Directory containing the <code className="bg-surface-container rounded px-1">whisper-cli</code> binary.
+                URL of the host-native ASR service. From inside Docker, reach the host via <code className="bg-surface-container rounded px-1">host.docker.internal</code>.
               </p>
             </div>
 
             <div className="flex flex-col gap-space-1">
-              <label className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Model</label>
-              <Select
-                value={whisperConfig.model}
-                onChange={(v) => setWhisperConfig((c) => ({ ...c, model: v }))}
-                options={whisperConfig.available_models.map((m) => ({ value: m.name, label: m.name }))}
-                size="md"
-              />
-              {/* Model info table */}
-              {whisperConfig.available_models.length > 0 && (
-                <div className="mt-space-2 rounded border border-outline-variant overflow-hidden">
-                  <div className="grid grid-cols-4 gap-0 text-[11px] font-label-sm text-on-surface-variant bg-surface border-b border-outline-variant px-3 py-1.5 uppercase tracking-wider">
-                    <div>Model</div><div>Size</div><div>Speed</div><div>Quality</div>
-                  </div>
-                  {whisperConfig.available_models.map((m) => (
-                    <div
-                      key={m.name}
-                      className={`grid grid-cols-4 gap-0 text-[11px] font-body-sm px-3 py-1.5 border-b border-outline-variant/50 last:border-0 ${
-                        whisperConfig.model === m.name ? 'bg-primary-container/20 text-on-surface' : 'text-on-surface-variant'
-                      }`}
-                    >
-                      <div className={whisperConfig.model === m.name ? 'font-bold text-primary' : ''}>{m.name}</div>
-                      <div>{m.size}</div>
-                      <div>{m.speed}</div>
-                      <div>{m.quality}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <label className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Models</label>
+              <p className="font-body-md text-body-md text-on-surface">
+                {!asrStatus
+                  ? '—'
+                  : asrStatus.models_loaded
+                    ? 'Loaded'
+                    : asrStatus.connected
+                      ? 'Not yet loaded (loads on first transcription)'
+                      : 'Unknown'}
+              </p>
             </div>
 
-            <div className="flex flex-col gap-space-1">
-              <label className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">
-                Model File Path
-                <span className="ml-2 font-body-sm text-body-sm text-on-surface-variant normal-case tracking-normal">
-                  (optional — auto-detected from binary path)
-                </span>
-              </label>
-              <input
-                type="text"
-                className="px-space-3 py-2 rounded border border-outline-variant bg-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none font-body-md text-body-md text-on-surface transition-all"
-                placeholder="/path/to/models/ggml-base.bin"
-                value={whisperConfig.model_path}
-                onChange={(e) => setWhisperConfig((c) => ({ ...c, model_path: e.target.value }))}
-              />
-            </div>
-
-            {whisperSaveMsg && (
-              <p className="font-body-sm text-body-sm text-primary">{whisperSaveMsg}</p>
+            {asrSaveMsg && (
+              <p className="font-body-sm text-body-sm text-primary">{asrSaveMsg}</p>
             )}
 
-            <button
-              onClick={handleSaveWhisper}
-              disabled={whisperSaving}
-              className="bg-primary text-on-primary font-label-md text-label-md py-2 px-4 rounded-lg flex items-center gap-2 hover:opacity-90 transition-opacity shadow-sm disabled:opacity-50"
-            >
-              <span className={`material-symbols-outlined text-[18px] ${whisperSaving ? 'animate-spin' : ''}`}>
-                {whisperSaving ? 'sync' : 'save'}
-              </span>
-              Save
-            </button>
+            <div className="flex gap-space-3">
+              <button
+                onClick={handleTestAsr}
+                disabled={asrTesting}
+                className="border border-outline-variant bg-surface-container-lowest text-on-surface font-label-md text-label-md py-2 px-4 rounded-lg flex items-center gap-2 hover:bg-surface-container-low transition-colors shadow-sm disabled:opacity-50"
+              >
+                <span className={`material-symbols-outlined text-[18px] ${asrTesting ? 'animate-spin' : ''}`}>
+                  {asrTesting ? 'sync' : 'wifi'}
+                </span>
+                Test connection
+              </button>
+              <button
+                onClick={handleSaveAsrConfig}
+                disabled={asrSaving}
+                className="bg-primary text-on-primary font-label-md text-label-md py-2 px-4 rounded-lg flex items-center gap-2 hover:opacity-90 transition-opacity shadow-sm disabled:opacity-50"
+              >
+                <span className={`material-symbols-outlined text-[18px] ${asrSaving ? 'animate-spin' : ''}`}>
+                  {asrSaving ? 'sync' : 'save'}
+                </span>
+                Save
+              </button>
+            </div>
           </div>
         </section>
 

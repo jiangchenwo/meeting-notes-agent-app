@@ -5,13 +5,15 @@ import remarkGfm from 'remark-gfm';
 import StatusBadge from '../components/StatusBadge';
 import { getNote, updateNote } from '../api/notes';
 import { getProjects } from '../api/projects';
+import { getProjectSpeakers, createProjectSpeaker } from '../api/speakers';
 import { getDomains, getTemplates } from '../api/domains';
 import { startTranscription, getTranscription, updateTranscription, updateSegments } from '../api/transcribe';
 import { startSummarization, getSummary, getPromptPreview, getLMStudioStatus, updateSummary } from '../api/summarize';
 import { exportNote, copyText } from '../api/export';
 import Breadcrumb from '../components/Breadcrumb';
 import Select from '../components/Select';
-import type { NoteBlock, Project, Domain, Template, Transcription, Summary, LMStudioStatus } from '../api/types';
+import type { NoteBlock, Project, ProjectSpeaker, Domain, Template, Transcription, Summary, LMStudioStatus } from '../api/types';
+import { speakerColor } from '../lib/speakerColor';
 
 function fmtSeconds(s: number): string {
   const m = Math.floor(s / 60);
@@ -81,8 +83,13 @@ export default function AudioManagement() {
 
   // Segment editing
   const [editingSegments, setEditingSegments] = useState(false);
-  const [draftSegments, setDraftSegments] = useState<{ start: number; end: number; text: string }[]>([]);
+  const [draftSegments, setDraftSegments] = useState<{ start: number; end: number; text: string; speaker?: string | null }[]>([]);
   const [savingSegments, setSavingSegments] = useState(false);
+  // Bulk-rename rows for the Speakers panel: id is the label at edit-start (stable key)
+  const [speakerRows, setSpeakerRows] = useState<{ id: string; name: string }[]>([]);
+
+  // Per-project speaker roster (shared vocabulary for consistent labels)
+  const [roster, setRoster] = useState<ProjectSpeaker[]>([]);
 
   // Summary field editing
   const [editingSummary, setEditingSummary] = useState(false);
@@ -125,6 +132,13 @@ export default function AudioManagement() {
     getTemplates(note.domain_id).then(setTemplates);
   }, [note?.domain_id]);
 
+  // Load the project's speaker roster so rename/reassign fields can autocomplete
+  useEffect(() => {
+    const pid = note?.project_id;
+    if (!pid) { setRoster([]); return; }
+    getProjectSpeakers(pid).then(setRoster).catch(() => setRoster([]));
+  }, [note?.project_id]);
+
   // Poll while transcribing
   useEffect(() => {
     if (note?.status !== 'transcribing') return;
@@ -166,7 +180,7 @@ export default function AudioManagement() {
     if (!note) return;
     setTranscribeError(null);
     try {
-      await startTranscription(id);
+      await startTranscription(id, true);
       setNote((prev) => prev ? { ...prev, status: 'transcribing' } : prev);
     } catch (err) {
       setTranscribeError(err instanceof Error ? err.message : 'Failed to start transcription');
@@ -245,17 +259,50 @@ export default function AudioManagement() {
   };
 
   const startEditSegments = () => {
-    setDraftSegments(transcription?.segments.map((s) => ({ ...s })) ?? []);
+    const segs = transcription?.segments.map((s) => ({ ...s })) ?? [];
+    setDraftSegments(segs);
+    const distinct = Array.from(new Set(segs.map((s) => s.speaker).filter((x): x is string => !!x)));
+    setSpeakerRows(distinct.map((name) => ({ id: name, name })));
     setEditingSegments(true);
   };
 
-  const cancelEditSegments = () => { setEditingSegments(false); setDraftSegments([]); };
+  const cancelEditSegments = () => { setEditingSegments(false); setDraftSegments([]); setSpeakerRows([]); };
+
+  // Bulk rename: change every segment that currently carries this speaker's name
+  const renameSpeakerRow = (rowId: string, newName: string) => {
+    const row = speakerRows.find((r) => r.id === rowId);
+    const oldName = row ? row.name : '';
+    setSpeakerRows((rows) => rows.map((r) => (r.id === rowId ? { ...r, name: newName } : r)));
+    setDraftSegments((segs) => segs.map((s) => (s.speaker === oldName ? { ...s, speaker: newName } : s)));
+  };
+
+  // Per-segment reassignment: fix a single mis-attributed line
+  const reassignSegmentSpeaker = (index: number, value: string) => {
+    setDraftSegments((segs) => segs.map((s, i) => (i === index ? { ...s, speaker: value === '' ? null : value } : s)));
+  };
+
+  // Autocomplete pool: project roster names + speakers already present in this transcript
+  const speakerSuggestions = Array.from(new Set([
+    ...roster.map((r) => r.name),
+    ...draftSegments.map((s) => s.speaker).filter((x): x is string => !!x),
+  ]));
 
   const commitEditSegments = async () => {
     setSavingSegments(true);
     try {
       const updated = await updateSegments(id, draftSegments);
       setTranscription(updated);
+      // Persist any newly-typed names to the project roster for cross-meeting consistency
+      const pid = note?.project_id;
+      if (pid) {
+        const names = Array.from(new Set(draftSegments.map((s) => s.speaker).filter((x): x is string => !!x)));
+        const known = new Set(roster.map((r) => r.name.toLowerCase()));
+        const toAdd = names.filter((n) => !known.has(n.toLowerCase()));
+        if (toAdd.length) {
+          await Promise.all(toAdd.map((name) => createProjectSpeaker(pid, { name }).catch(() => null)));
+          getProjectSpeakers(pid).then(setRoster).catch(() => {});
+        }
+      }
       setEditingSegments(false);
     } catch {} finally { setSavingSegments(false); }
   };
@@ -496,7 +543,34 @@ export default function AudioManagement() {
                     )}
                   </div>
                 </div>
+                {/* Speakers panel — rename a speaker once to relabel every line they said */}
+                {editingSegments && speakerRows.length > 0 && (
+                  <div className="mb-space-3 p-space-3 rounded border border-outline-variant/50 bg-surface-container-low/30">
+                    <p className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-space-2">Speakers</p>
+                    <div className="space-y-space-2">
+                      {speakerRows.map((row) => (
+                        <div key={row.id} className="flex items-center gap-space-2">
+                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: speakerColor(row.name) }} />
+                          <input
+                            list="speaker-suggestions"
+                            className="flex-1 font-body-sm text-body-sm text-on-surface bg-surface-container-low border border-primary/50 rounded px-2 py-1 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                            value={row.name}
+                            onChange={(e) => renameSpeakerRow(row.id, e.target.value)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <p className="font-body-sm text-body-sm text-on-surface-variant mt-space-2">
+                      Renaming updates every line by that speaker.{note?.project_id ? ' New names are saved to the project’s people for reuse across meetings.' : ''}
+                    </p>
+                  </div>
+                )}
                 <div className="space-y-space-2">
+                  <datalist id="speaker-suggestions">
+                    {speakerSuggestions.map((name) => (
+                      <option key={name} value={name} />
+                    ))}
+                  </datalist>
                   {!transcription?.segments.length && (
                     <p className="text-on-surface-variant font-body-sm text-body-sm">No segments found in transcript.</p>
                   )}
@@ -506,11 +580,21 @@ export default function AudioManagement() {
                           <div className="w-16 flex-shrink-0 text-right pt-2">
                             <span className="font-label-sm text-label-sm text-on-surface-variant">{fmtSeconds(seg.start)}</span>
                           </div>
-                          <input
-                            className="flex-1 font-body-md text-body-md text-on-surface bg-surface-container-low border border-primary/50 rounded px-2 py-1 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                            value={seg.text}
-                            onChange={(e) => setDraftSegments((prev) => prev.map((s, idx) => idx === i ? { ...s, text: e.target.value } : s))}
-                          />
+                          <div className="flex-1 flex flex-col gap-1">
+                            <input
+                              list="speaker-suggestions"
+                              placeholder="Speaker"
+                              className="w-44 font-label-sm text-label-sm bg-surface-container-low border border-outline-variant rounded px-2 py-1 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                              style={seg.speaker ? { color: speakerColor(seg.speaker) } : undefined}
+                              value={seg.speaker ?? ''}
+                              onChange={(e) => reassignSegmentSpeaker(i, e.target.value)}
+                            />
+                            <input
+                              className="font-body-md text-body-md text-on-surface bg-surface-container-low border border-primary/50 rounded px-2 py-1 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                              value={seg.text}
+                              onChange={(e) => setDraftSegments((prev) => prev.map((s, idx) => idx === i ? { ...s, text: e.target.value } : s))}
+                            />
+                          </div>
                         </div>
                       ))
                     : transcription?.segments.map((seg, i) => (
@@ -523,7 +607,12 @@ export default function AudioManagement() {
                           <div className="w-16 flex-shrink-0 text-right pt-1">
                             <span className="font-label-sm text-label-sm text-on-surface-variant">{fmtSeconds(seg.start)}</span>
                           </div>
-                          <p className="flex-1 font-body-md text-body-md text-on-surface leading-relaxed">{seg.text}</p>
+                          <div className="flex-1">
+                            {seg.speaker && (
+                              <span className="block font-label-sm text-label-sm mb-1" style={{ color: speakerColor(seg.speaker) }}>{seg.speaker}</span>
+                            )}
+                            <p className="font-body-md text-body-md text-on-surface leading-relaxed">{seg.text}</p>
+                          </div>
                         </div>
                       ))
                   }

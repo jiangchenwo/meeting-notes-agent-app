@@ -9,6 +9,10 @@ notes.db-wal
 # Uploaded audio files
 backend/uploads/
 
+# Runtime settings (edited in-app; persisted under CONFIG_DIR — /data in Docker)
+backend/lm_config.json
+backend/asr_config.json
+
 # # Python
 # __pycache__/
 # *.py[cod]
@@ -87,6 +91,7 @@ backend/eval/audio/
 backend/eval/history/
 .mcp.json
 .claude/
+.superpowers/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -230,3 +235,6 @@ poetry.toml
 
 # LSP config files
 pyrightconfig.json
+
+docs/
+data/

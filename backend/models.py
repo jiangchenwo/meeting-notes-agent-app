@@ -2,7 +2,7 @@ import datetime
 import os
 from typing import Optional
 from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from database import Base
 
 
@@ -54,6 +54,20 @@ class Project(Base):
     @property
     def total_size(self) -> int:
         return sum(nb.audio_file_size or 0 for nb in self.note_blocks)
+
+
+class ProjectSpeaker(Base):
+    __tablename__ = "project_speakers"
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
+    name = Column(String, nullable=False)
+    color = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    project = relationship(
+        "Project",
+        backref=backref("speakers", cascade="all, delete-orphan"),
+    )
 
 
 class NoteBlock(Base):
@@ -108,6 +122,7 @@ class Transcription(Base):
     segments_json = Column(Text, default="[]")
     language = Column(String, nullable=True)
     model_used = Column(String, nullable=True)
+    diarized = Column(Boolean, default=False)
     note_block = relationship("NoteBlock", backref="transcription")
 
 

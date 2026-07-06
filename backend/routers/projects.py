@@ -1,9 +1,17 @@
 import datetime
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 from database import get_db
-from models import Project, NoteBlock
-from schemas import ProjectCreate, ProjectResponse, ProjectUpdate
+from models import Project, NoteBlock, ProjectSpeaker
+from schemas import (
+    ProjectCreate,
+    ProjectResponse,
+    ProjectUpdate,
+    ProjectSpeakerCreate,
+    ProjectSpeakerResponse,
+    ProjectSpeakerUpdate,
+)
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -55,5 +63,84 @@ def delete_project(project_id: int, db: Session = Depends(get_db)):
     if not p:
         raise HTTPException(404, "Project not found")
     db.delete(p)
+    db.commit()
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Per-project speaker roster — shared vocabulary for consistent speaker labels
+# ---------------------------------------------------------------------------
+def _require_project(project_id: int, db: Session) -> Project:
+    p = db.get(Project, project_id)
+    if not p:
+        raise HTTPException(404, "Project not found")
+    return p
+
+
+@router.get("/{project_id}/speakers", response_model=list[ProjectSpeakerResponse])
+def list_project_speakers(project_id: int, db: Session = Depends(get_db)):
+    _require_project(project_id, db)
+    return (
+        db.query(ProjectSpeaker)
+        .filter(ProjectSpeaker.project_id == project_id)
+        .order_by(ProjectSpeaker.name)
+        .all()
+    )
+
+
+@router.post("/{project_id}/speakers", response_model=ProjectSpeakerResponse, status_code=201)
+def create_project_speaker(
+    project_id: int, body: ProjectSpeakerCreate, db: Session = Depends(get_db)
+):
+    _require_project(project_id, db)
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(422, "Speaker name cannot be empty")
+    existing = (
+        db.query(ProjectSpeaker)
+        .filter(
+            ProjectSpeaker.project_id == project_id,
+            func.lower(ProjectSpeaker.name) == name.lower(),
+        )
+        .first()
+    )
+    if existing:
+        return existing
+    speaker = ProjectSpeaker(project_id=project_id, name=name, color=body.color)
+    db.add(speaker)
+    db.commit()
+    db.refresh(speaker)
+    return speaker
+
+
+@router.patch("/{project_id}/speakers/{speaker_id}", response_model=ProjectSpeakerResponse)
+def update_project_speaker(
+    project_id: int,
+    speaker_id: int,
+    body: ProjectSpeakerUpdate,
+    db: Session = Depends(get_db),
+):
+    speaker = db.get(ProjectSpeaker, speaker_id)
+    if not speaker or speaker.project_id != project_id:
+        raise HTTPException(404, "Speaker not found")
+    data = body.model_dump(exclude_unset=True)
+    if "name" in data:
+        name = (data["name"] or "").strip()
+        if not name:
+            raise HTTPException(422, "Speaker name cannot be empty")
+        data["name"] = name
+    for field, value in data.items():
+        setattr(speaker, field, value)
+    db.commit()
+    db.refresh(speaker)
+    return speaker
+
+
+@router.delete("/{project_id}/speakers/{speaker_id}")
+def delete_project_speaker(project_id: int, speaker_id: int, db: Session = Depends(get_db)):
+    speaker = db.get(ProjectSpeaker, speaker_id)
+    if not speaker or speaker.project_id != project_id:
+        raise HTTPException(404, "Speaker not found")
+    db.delete(speaker)
     db.commit()
     return {"ok": True}

@@ -4,9 +4,11 @@ import StatusBadge from '../components/StatusBadge';
 import Breadcrumb from '../components/Breadcrumb';
 import Select from '../components/Select';
 import { getProject, updateProject } from '../api/projects';
+import { getProjectSpeakers, createProjectSpeaker, updateProjectSpeaker, deleteProjectSpeaker } from '../api/speakers';
 import { getNotes } from '../api/notes';
 import { resolveColor, colorSwatchClass, projectIconClass, COLORS } from '../lib/domains';
-import type { NoteBlock, Project } from '../api/types';
+import { speakerColor } from '../lib/speakerColor';
+import type { NoteBlock, Project, ProjectSpeaker } from '../api/types';
 
 const PROJECT_ICONS = [
   'folder', 'work', 'business_center', 'groups', 'code', 'science',
@@ -49,9 +51,14 @@ export default function ProjectDetail() {
   const [project, setProject] = useState<Project | null>(null);
   const [notes, setNotes] = useState<NoteBlock[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'overview' | 'system_prompt' | 'knowledge_base'>('overview');
+  const [tab, setTab] = useState<'overview' | 'system_prompt' | 'knowledge_base' | 'people'>('overview');
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [search, setSearch] = useState('');
+
+  // People (speaker roster) tab state
+  const [speakers, setSpeakers] = useState<ProjectSpeaker[]>([]);
+  const [newSpeaker, setNewSpeaker] = useState('');
+  const [addingSpeaker, setAddingSpeaker] = useState(false);
 
   // Inline edit state
   const [inlineEditing, setInlineEditing] = useState(false);
@@ -80,7 +87,39 @@ export default function ProjectDetail() {
         setSpDraft(p.custom_system_prompt);
       })
       .finally(() => setLoading(false));
+    getProjectSpeakers(projectId).then(setSpeakers).catch(() => setSpeakers([]));
   }, [projectId]);
+
+  const setSpeakerNameLocal = (sid: number, name: string) =>
+    setSpeakers((prev) => prev.map((s) => (s.id === sid ? { ...s, name } : s)));
+
+  const handleAddSpeaker = async () => {
+    const name = newSpeaker.trim();
+    if (!name) return;
+    setAddingSpeaker(true);
+    const created = await createProjectSpeaker(projectId, { name }).catch(() => null);
+    setAddingSpeaker(false);
+    if (created) {
+      setSpeakers((prev) =>
+        prev.some((s) => s.id === created.id)
+          ? prev
+          : [...prev, created].sort((a, b) => a.name.localeCompare(b.name)),
+      );
+      setNewSpeaker('');
+    }
+  };
+
+  const handleRenameSpeaker = async (sid: number, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const updated = await updateProjectSpeaker(projectId, sid, { name: trimmed }).catch(() => null);
+    if (updated) setSpeakers((prev) => prev.map((s) => (s.id === sid ? updated : s)));
+  };
+
+  const handleDeleteSpeaker = async (sid: number) => {
+    const ok = await deleteProjectSpeaker(projectId, sid).then(() => true).catch(() => false);
+    if (ok) setSpeakers((prev) => prev.filter((s) => s.id !== sid));
+  };
 
   const startInlineEdit = (p: Project) => {
     setEditName(p.name);
@@ -177,6 +216,7 @@ export default function ProjectDetail() {
             ['overview', 'Overview'],
             ['system_prompt', 'System Prompt'],
             ['knowledge_base', 'Knowledge Base'],
+            ['people', 'People'],
           ] as const).map(([t, label]) => (
             <button
               key={t}
@@ -269,6 +309,62 @@ export default function ProjectDetail() {
                 {kbSaving ? 'Saving…' : kbSaved ? 'Saved' : 'Save'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* People tab — project speaker roster */}
+      {tab === 'people' && (
+        <div className="bg-surface-container-lowest rounded-lg p-space-6 flex flex-col gap-space-4 max-w-2xl">
+          <div>
+            <h2 className="font-headline-md text-headline-md text-on-surface mb-space-1">People</h2>
+            <p className="font-body-sm text-body-sm text-on-surface-variant">
+              Known participants for this project. These names autocomplete when you label speakers in a
+              recording, keeping labels consistent across meetings. New names you type while editing a transcript
+              are added here automatically.
+            </p>
+          </div>
+          <div className="flex flex-col gap-space-2">
+            {speakers.length === 0 && (
+              <p className="font-body-sm text-body-sm text-on-surface-variant/70 italic">
+                No people yet. Add participants below, or they’ll appear here once you name speakers in a recording.
+              </p>
+            )}
+            {speakers.map((s) => (
+              <div key={s.id} className="flex items-center gap-space-2">
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: speakerColor(s.name) }} />
+                <input
+                  value={s.name}
+                  onChange={(e) => setSpeakerNameLocal(s.id, e.target.value)}
+                  onBlur={(e) => handleRenameSpeaker(s.id, e.target.value)}
+                  className="flex-1 p-space-2 rounded border border-outline-variant bg-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none font-body-md text-body-md text-on-surface transition-all"
+                />
+                <button
+                  onClick={() => handleDeleteSpeaker(s.id)}
+                  aria-label="Remove person"
+                  className="p-space-1 rounded text-on-surface-variant hover:text-error hover:bg-surface-container-high transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[18px]">delete</span>
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center gap-space-2 pt-space-2 border-t border-outline-variant">
+            <input
+              value={newSpeaker}
+              onChange={(e) => setNewSpeaker(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleAddSpeaker(); }}
+              placeholder="Add a person…"
+              className="flex-1 p-space-2 rounded border border-outline-variant bg-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none font-body-md text-body-md text-on-surface transition-all"
+            />
+            <button
+              onClick={handleAddSpeaker}
+              disabled={addingSpeaker || !newSpeaker.trim()}
+              className="px-space-4 py-space-2 rounded font-label-md text-label-md text-on-primary bg-primary-container hover:bg-primary transition-colors flex items-center gap-space-2 disabled:opacity-50"
+            >
+              <span className="material-symbols-outlined text-[16px]">add</span>
+              Add
+            </button>
           </div>
         </div>
       )}

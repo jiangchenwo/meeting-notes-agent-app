@@ -5,6 +5,7 @@ import time
 
 from database import SessionLocal
 from models import NoteBlock, Transcription, Summary, WorkflowRun, WorkflowStepResult
+from transcript_format import build_speaker_transcript
 import lm_config
 
 from .base import WorkflowContext
@@ -278,7 +279,7 @@ def run_workflow(note_id: int) -> None:
 
         # Layer 1: inflate max_tokens so _truncate_transcript passes the full transcript.
         # With user-configured max_tokens=40960 this gives ~160K chars — fits most meetings.
-        transcript_text = transcription.full_text
+        transcript_text = build_speaker_transcript(transcription.full_text, transcription.segments_json)
         cfg = {**cfg, "max_tokens": max(cfg.get("max_tokens", 4096), len(transcript_text) // 4 + 1000)}
 
         # Layer 2: chunked map-reduce for transcripts that still exceed the context window.

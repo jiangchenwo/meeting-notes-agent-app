@@ -1,8 +1,11 @@
 import { apiFetch } from './client';
 import type { Transcription, TranscriptionSegment } from './types';
 
-export const startTranscription = (noteId: number) =>
-  apiFetch<{ status: string }>(`/notes/${noteId}/transcribe`, { method: 'POST' });
+export const startTranscription = (noteId: number, diarize = false) =>
+  apiFetch<{ status: string }>(
+    `/notes/${noteId}/transcribe?diarize=${diarize}`,
+    { method: 'POST' },
+  );
 
 export const getTranscription = (noteId: number) =>
   apiFetch<Transcription>(`/notes/${noteId}/transcription`);

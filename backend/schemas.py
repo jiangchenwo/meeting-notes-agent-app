@@ -136,3 +136,22 @@ class ProjectUpdate(BaseModel):
     knowledge_base: Optional[str] = None
     color: Optional[str] = None
     icon: Optional[str] = None
+
+
+class ProjectSpeakerResponse(BaseModel):
+    id: int
+    project_id: int
+    name: str
+    color: Optional[str] = None
+    created_at: datetime.datetime
+    model_config = {"from_attributes": True}
+
+
+class ProjectSpeakerCreate(BaseModel):
+    name: str
+    color: Optional[str] = None
+
+
+class ProjectSpeakerUpdate(BaseModel):
+    name: Optional[str] = None
+    color: Optional[str] = None

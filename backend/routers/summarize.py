@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from database import get_db, SessionLocal
 from models import NoteBlock, Transcription, Summary
+from transcript_format import build_speaker_transcript
 import lm_config
 
 router = APIRouter(prefix="/api/notes", tags=["summarization"])
@@ -38,7 +39,7 @@ def _build_prompt(note: NoteBlock, transcription: Transcription, cfg: dict) -> t
         else "Summarize the meeting: key decisions, action items, and blockers."
     )
 
-    transcript = transcription.full_text or ""
+    transcript = build_speaker_transcript(transcription.full_text, transcription.segments_json)
     max_chars = max(500, (cfg.get("max_tokens", 4096) - 1000) * 4)
     truncated = len(transcript) > max_chars
     if truncated:
