@@ -5,7 +5,6 @@
 REGISTRY      ?=
 TAG           ?= latest
 PLATFORMS     ?= linux/amd64,linux/arm64
-WHISPER_MODEL ?= base
 
 BACKEND_IMAGE  ?= $(if $(REGISTRY),$(REGISTRY)/,)meeting-notes-agent-backend:$(TAG)
 FRONTEND_IMAGE ?= $(if $(REGISTRY),$(REGISTRY)/,)meeting-notes-agent-frontend:$(TAG)
@@ -28,6 +27,10 @@ help:
 	@echo ""
 	@echo "Run prebuilt images on a target host:"
 	@echo "  make pull up REGISTRY=ghcr.io/you TAG=1.0"
+	@echo ""
+	@echo "Note: transcription/diarization (asr-service) is host-native and not"
+	@echo "covered by these targets — set it up separately on each host, see"
+	@echo "asr-service/README.md."
 
 build:
 	docker compose build
@@ -44,18 +47,15 @@ logs:
 pull:
 	docker compose pull
 
-# --- Portable multi-architecture publish (GGML_NATIVE=OFF for CPU portability) ---
+# --- Portable multi-architecture publish ---
 buildx: buildx-backend buildx-frontend
 
 buildx-backend:
 	@test -n "$(REGISTRY)" || { echo "Set REGISTRY, e.g. make buildx REGISTRY=ghcr.io/you"; exit 1; }
 	docker buildx build --platform $(PLATFORMS) \
-		--build-arg GGML_NATIVE=OFF \
-		--build-arg WHISPER_MODEL=$(WHISPER_MODEL) \
 		-t $(BACKEND_IMAGE) ./backend --push
 
 buildx-frontend:
 	@test -n "$(REGISTRY)" || { echo "Set REGISTRY, e.g. make buildx REGISTRY=ghcr.io/you"; exit 1; }
 	docker buildx build --platform $(PLATFORMS) \
-		--build-arg VITE_ENABLE_LAB=false \
 		-t $(FRONTEND_IMAGE) ./frontend --push

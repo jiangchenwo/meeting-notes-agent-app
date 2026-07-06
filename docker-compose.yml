@@ -4,19 +4,15 @@ services:
     image: ${BACKEND_IMAGE:-meeting-notes-agent-backend:latest}
     build:
       context: ./backend
-      args:
-        WHISPER_MODEL: base        # tiny | base | small | medium | large-v3
-        GGML_NATIVE: "OFF"         # OFF = portable image; ON = faster, host-CPU-tuned
-    environment:
-      ENABLE_LAB: "false"          # keep the Testing Lab out of the deployed app
-      # LM Studio runs on the host machine; reach it via host.docker.internal.
-      LM_STUDIO_BASE_URL: "http://host.docker.internal:1234/v1"
-      LM_STUDIO_MODEL: ""          # name of the model loaded in LM Studio
-      LM_STUDIO_MAX_TOKENS: "40960"
+    # ASR (transcription+diarization) and LM Studio connection settings are
+    # configured at runtime from the frontend Settings page and persisted to
+    # the app-data volume (CONFIG_DIR=/data, set in the backend image).
     extra_hosts:
       - "host.docker.internal:host-gateway"   # required on Linux, harmless on macOS/Windows
     volumes:
-      - app-data:/data             # notes.db + uploaded audio persist here
+      # One volume, split into subdirs by the backend: db/ (notes.db + WAL),
+      # uploads/ (audio), config/ (LM Studio + ASR settings JSON).
+      - app-data:/data
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/health"]
       interval: 30s
@@ -27,8 +23,6 @@ services:
     image: ${FRONTEND_IMAGE:-meeting-notes-agent-frontend:latest}
     build:
       context: ./frontend
-      args:
-        VITE_ENABLE_LAB: "false"
     ports:
       - "8080:80"                  # open http://localhost:8080
     depends_on:

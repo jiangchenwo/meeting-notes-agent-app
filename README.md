@@ -10,7 +10,7 @@ Upload Audio → Select Project + Domain + Template → Transcribe → Summarize
 
 1. Drop in an audio file (MP3, WAV, M4A up to 2 GB)
 2. Assign it to a **project** and pick a **domain** (General, Education, Healthcare, Interview, Project)
-3. [whisper.cpp](https://github.com/ggerganov/whisper.cpp) transcribes it locally
+3. A host-native [ASR service](asr-service/) transcribes it locally, with optional speaker diarization
 4. A local LLM generates a structured summary, action items, and domain-specific suggestions
 5. Review, edit, and export the notes as Markdown or plain text
 
@@ -18,17 +18,16 @@ Upload Audio → Select Project + Domain + Template → Transcribe → Summarize
 
 **Now**
 
-- Local [whisper.cpp](https://github.com/ggerganov/whisper.cpp) transcription — timestamped and editable
+- Local ASR transcription with optional speaker diarization — timestamped and editable
 - AI note generation — summary, action items, and domain-specific suggestions
-- Agentic multi-agent pipeline (orchestrator → agents → critic → verifiers) via API + Testing Lab
+- Agentic multi-agent pipeline (orchestrator → agents → critic → verifiers) via API
 - Projects with shared system prompt & knowledge base; custom domains & templates
 - Note management — full-text search, filters, color labels, drag-to-reorder, bulk ops
-- Testing Lab — benchmark the pipeline against eval datasets with quality metrics
-- Markdown / plain-text export; LM Studio + whisper configuration
+- Markdown / plain-text export; in-app ASR service + LM Studio configuration
 
 **Upcoming**
 
-- Wire the agentic workflow into the note page (today it runs via API + the Testing Lab)
+- Wire the agentic workflow into the note page (today it runs via API)
 - RAG / semantic search across all notes
 - Real-time microphone transcription
 - Calendar, webhook (Notion / Obsidian), and folder-watch integrations
@@ -105,7 +104,7 @@ A template can override the workflow for any note it's assigned to via the `work
 - Node.js 20+
 - Python 3.11+
 - [uv](https://docs.astral.sh/uv/) for Python package management
-- [whisper.cpp](https://github.com/ggerganov/whisper.cpp) compiled binary
+- The host-native [`asr-service`](asr-service/) running for transcription + diarization (see its README; Mac/Metal, can't be containerized)
 - [LM Studio](https://lmstudio.ai) with a model loaded
 
 ### Backend
@@ -124,16 +123,25 @@ npm install
 npm run dev   # http://localhost:5173
 ```
 
-`notes.db` and `uploads/` are created automatically at the repo root on first run.
+### ASR service
 
-Optional overrides in `backend/.env`:
+Transcription + diarization run in a separate host-native service (Metal can't be
+containerized on Mac). Start it on its default port `:9000`:
 
-```env
-WHISPER_BINARY_PATH=/usr/local/bin/whisper-cpp
-WHISPER_MODEL=base
-LM_STUDIO_BASE_URL=http://localhost:1234/v1
-LM_STUDIO_MODEL=your-model-name
+```bash
+cd asr-service
+uv sync
+./start.sh    # serves on http://localhost:9000
 ```
+
+See [`asr-service/README.md`](asr-service/README.md) for model caching and details.
+
+`notes.db`, `uploads/`, and config JSON are created automatically at the repo root on first run. In Docker they live on a single persistent `/data` volume, split into `db/`, `uploads/`, and `config/` subdirectories (an existing volume from an earlier version is migrated into this layout automatically on startup).
+
+Connection settings for the **ASR service** and **LM Studio** (base URLs, model,
+token limits, system prompt) are configured from the in-app **Settings** page —
+no `.env` required. They persist to disk (under `CONFIG_DIR` — `/data/config` on
+the Docker volume) and survive container recreation.
 
 ## How to use
 
@@ -151,7 +159,7 @@ Click the note block's name to open it. In the right panel, assign:
 
 ### 3. Transcribe
 
-Click **Transcribe**. The status changes to **Transcribing** while whisper.cpp processes the audio locally. When done it switches to **Transcribed** and the timestamped transcript appears in the Segments and Full Text tabs.
+Click **Transcribe**. The status changes to **Transcribing** while the ASR service processes the audio locally (optionally labelling speakers). When done it switches to **Transcribed** and the timestamped transcript appears in the Segments and Full Text tabs.
 
 You can edit the transcript directly on the Full Text tab before summarizing.
 
@@ -165,7 +173,7 @@ Results appear across tabs, each editable inline:
 - **Action Items** — checklist with owner, deadline, and priority
 - **Suggestions** — domain-specific output (decisions, concepts, interview flags, etc.)
 
-To run the full multi-agent pipeline — orchestrator, critic retries, and schema/risk verification — and compare it against the single-call path with quality metrics, open the **Testing Lab** (`/lab`).
+The full multi-agent pipeline — orchestrator, critic retries, and schema/risk verification — runs via the workflow API (`POST /api/notes/{id}/run-workflow`); wiring it into the note page UI is on the roadmap.
 
 ### 5. Export
 
@@ -179,9 +187,9 @@ Open **Projects** to create and organize projects. Inside a project:
 - **System Prompt** — write a persona instruction that overrides the default assistant for this project (e.g. "Focus on engineering decisions and ticket references")
 - **Knowledge Base** — add structured Markdown context (team members, glossary, recurring topics) that the LLM injects automatically when generating notes
 
-### Configuring whisper and the LLM
+### Configuring the ASR service and the LLM
 
-Open **Settings** to set the whisper.cpp binary path, model size, and LM Studio endpoint. Use **Test Connection** to verify LM Studio is reachable before running a workflow.
+Open **Settings** to set the ASR service URL and the LM Studio endpoint (plus model, token limits, and system prompt). Use **Test connection** on each to verify they're reachable before running a workflow. These settings are saved server-side and persist across restarts — no `.env` needed.
 
 ---
 
@@ -195,7 +203,7 @@ Open **Settings** to set the whisper.cpp binary path, model size, and LM Studio 
 | Routing       | React Router v6                              |
 | Backend       | Python + FastAPI                             |
 | Database      | SQLite                                       |
-| Transcription | whisper.cpp (local binary)                   |
+| Transcription | Host-native ASR service — MLX-Whisper (Metal) + pyannote diarization |
 | LLM           | LM Studio (OpenAI-compatible local endpoint) |
 
 ## Design principles
