@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '../api/client';
 import Select from '../components/Select';
-import { getLMConfig, updateLMConfig, getLMStudioStatus, getAsrStatus, getAsrConfig, updateAsrConfig } from '../api/summarize';
-import type { LMConfig, LMStudioStatus, AsrStatus, AsrConfig } from '../api/types';
+import { getLMConfig, updateLMConfig, getLMStudioStatus, getAsrStatus, getAsrConfig, updateAsrConfig, getTelemetryConfig, updateTelemetryConfig } from '../api/summarize';
+import type { LMConfig, LMStudioStatus, AsrStatus, AsrConfig, TelemetryConfig } from '../api/types';
 
 type RestoreResult = { ok: boolean; restored: { domains: number; templates: number } };
 
@@ -10,7 +10,7 @@ export default function Settings() {
   const [restoring, setRestoring] = useState(false);
   const [restoreMsg, setRestoreMsg] = useState<string | null>(null);
 
-  const [lmConfig, setLmConfig] = useState<LMConfig>({ base_url: '', model: '', max_tokens: 4096, max_response_tokens: 2048, global_system_prompt: '' });
+  const [lmConfig, setLmConfig] = useState<LMConfig>({ base_url: '', model: '', max_tokens: 4096, max_response_tokens: 2048, global_system_prompt: '', output_mode: 'native' });
   const [lmStatus, setLmStatus] = useState<LMStudioStatus | null>(null);
   const [lmSaving, setLmSaving] = useState(false);
   const [lmSaveMsg, setLmSaveMsg] = useState<string | null>(null);
@@ -22,11 +22,16 @@ export default function Settings() {
   const [asrSaving, setAsrSaving] = useState(false);
   const [asrSaveMsg, setAsrSaveMsg] = useState<string | null>(null);
 
+  const [telemetry, setTelemetry] = useState<TelemetryConfig>({ enabled: false, endpoint: 'http://localhost:6006', capture_content: true });
+  const [telemetrySaving, setTelemetrySaving] = useState(false);
+  const [telemetrySaveMsg, setTelemetrySaveMsg] = useState<string | null>(null);
+
   useEffect(() => {
     getLMConfig().then(setLmConfig).catch(() => {});
     getLMStudioStatus().then(setLmStatus).catch(() => setLmStatus({ connected: false, models: [] }));
     getAsrConfig().then(setAsrConfig).catch(() => {});
     getAsrStatus().then(setAsrStatus).catch(() => setAsrStatus(null));
+    getTelemetryConfig().then(setTelemetry).catch(() => {});
   }, []);
 
   const handleBackup = () => {
@@ -93,6 +98,20 @@ export default function Settings() {
       setAsrSaveMsg('Save failed.');
     } finally {
       setAsrSaving(false);
+    }
+  };
+
+  const handleSaveTelemetry = async () => {
+    setTelemetrySaving(true);
+    setTelemetrySaveMsg(null);
+    try {
+      const { active, ...saved } = await updateTelemetryConfig(telemetry);
+      setTelemetry(saved);
+      setTelemetrySaveMsg(active ? 'Saved — tracing is active.' : 'Saved — tracing is off.');
+    } catch {
+      setTelemetrySaveMsg('Save failed.');
+    } finally {
+      setTelemetrySaving(false);
     }
   };
 
@@ -311,6 +330,24 @@ export default function Settings() {
 
             <div className="flex flex-col gap-space-1">
               <label className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">
+                Structured Output Mode
+              </label>
+              <Select
+                value={lmConfig.output_mode}
+                onChange={(v) => setLmConfig((c) => ({ ...c, output_mode: v as LMConfig['output_mode'] }))}
+                options={[
+                  { value: 'native', label: 'Native (json_schema — recommended for LM Studio)' },
+                  { value: 'prompted', label: 'Prompted (schema in prompt — universal fallback)' },
+                ]}
+                size="md"
+              />
+              <p className="font-body-sm text-body-sm text-on-surface-variant">
+                How agents request JSON from the model. Switch to Prompted if your endpoint rejects <code className="bg-surface-container rounded px-1">response_format: json_schema</code>.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-space-1">
+              <label className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">
                 Global System Prompt
               </label>
               <textarea
@@ -350,6 +387,75 @@ export default function Settings() {
                 Save
               </button>
             </div>
+          </div>
+        </section>
+
+        {/* Tracing (Phoenix) */}
+        <section className="bg-surface-container-lowest rounded-xl overflow-hidden">
+          <div className="px-space-6 py-space-4 border-b border-outline-variant">
+            <h3 className="font-headline-md text-headline-md text-on-surface flex items-center gap-2">
+              <span className="material-symbols-outlined text-[20px] text-primary">monitoring</span>
+              Tracing (Phoenix)
+            </h3>
+            <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
+              Send agent-run traces (steps, prompts, tokens, latency) to a local Arize Phoenix instance. Everything stays on this machine.
+            </p>
+          </div>
+
+          <div className="p-space-6 space-y-space-4">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                className="w-4 h-4 accent-primary"
+                checked={telemetry.enabled}
+                onChange={(e) => setTelemetry((t) => ({ ...t, enabled: e.target.checked }))}
+              />
+              <span className="font-label-md text-label-md text-on-surface">Enable tracing</span>
+            </label>
+
+            <div className="flex flex-col gap-space-1">
+              <label className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Phoenix URL</label>
+              <input
+                type="text"
+                className="px-space-3 py-2 rounded border border-outline-variant bg-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none font-body-md text-body-md text-on-surface transition-all"
+                placeholder="http://localhost:6006"
+                value={telemetry.endpoint}
+                onChange={(e) => setTelemetry((t) => ({ ...t, endpoint: e.target.value }))}
+              />
+              <p className="font-body-sm text-body-sm text-on-surface-variant">
+                Start Phoenix with <code className="bg-surface-container rounded px-1">uvx arize-phoenix serve</code>, then open it at this URL to browse traces.
+              </p>
+            </div>
+
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                className="w-4 h-4 accent-primary"
+                checked={telemetry.capture_content}
+                onChange={(e) => setTelemetry((t) => ({ ...t, capture_content: e.target.checked }))}
+              />
+              <span className="font-label-md text-label-md text-on-surface">
+                Include prompts &amp; responses in traces
+                <span className="block font-body-sm text-[12px] text-on-surface-variant font-normal">
+                  Turn off for sensitive transcripts — spans then carry only timing and token metadata.
+                </span>
+              </span>
+            </label>
+
+            {telemetrySaveMsg && (
+              <p className="font-body-sm text-body-sm text-primary">{telemetrySaveMsg}</p>
+            )}
+
+            <button
+              onClick={handleSaveTelemetry}
+              disabled={telemetrySaving}
+              className="bg-primary text-on-primary font-label-md text-label-md py-2 px-4 rounded-lg flex items-center gap-2 hover:opacity-90 transition-opacity shadow-sm disabled:opacity-50"
+            >
+              <span className={`material-symbols-outlined text-[18px] ${telemetrySaving ? 'animate-spin' : ''}`}>
+                {telemetrySaving ? 'sync' : 'save'}
+              </span>
+              Save
+            </button>
           </div>
         </section>
 

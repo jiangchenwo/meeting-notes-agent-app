@@ -46,6 +46,10 @@ def get_workflow_run(note_id: int, db: Session = Depends(get_db)):
             "current_step": run.current_step,
             "workflow_plan": json.loads(run.workflow_plan_json) if run.workflow_plan_json else None,
             "error_message": run.error_message,
+            "total_input_tokens": run.total_input_tokens,
+            "total_output_tokens": run.total_output_tokens,
+            "model_name": run.model_name,
+            "trace_id": run.trace_id,
             "started_at": run.started_at.isoformat() if run.started_at else None,
             "finished_at": run.finished_at.isoformat() if run.finished_at else None,
         }
@@ -81,6 +85,9 @@ def get_workflow_steps(note_id: int, db: Session = Depends(get_db)):
                 "duration_ms": s.duration_ms,
                 "critique_score": s.critique_score,
                 "attempt": s.attempt,
+                "input_tokens": s.input_tokens,
+                "output_tokens": s.output_tokens,
+                "model_name": s.model_name,
                 "result": json.loads(s.result_json) if s.result_json else None,
                 "created_at": s.created_at.isoformat() if s.created_at else None,
             }

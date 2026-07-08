@@ -1,7 +1,9 @@
 import json
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
+from agents.workflow_spec import WorkflowSpec
 from database import get_db
 from models import Domain, Template
 from schemas import (
@@ -10,6 +12,20 @@ from schemas import (
 )
 
 router = APIRouter(prefix="/api", tags=["domains"])
+
+
+def _validate_workflow_config(value: Optional[str]) -> Optional[str]:
+    """Strict write-path validation; the read path (select_workflow) stays
+    lenient. Empty/blank clears the override."""
+    if value is None or not value.strip():
+        return None
+    try:
+        WorkflowSpec.model_validate_json(value)
+    except ValidationError as exc:
+        raise HTTPException(422, detail=json.loads(exc.json()))
+    except ValueError as exc:
+        raise HTTPException(422, detail=str(exc))
+    return value
 
 
 # ── Domains ──────────────────────────────────────────────────────────────────
@@ -76,6 +92,7 @@ def create_template(body: TemplateCreate, db: Session = Depends(get_db)):
         domain_id=body.domain_id,
         prompt_template=body.prompt_template,
         output_sections=json.dumps(body.output_sections),
+        workflow_config=_validate_workflow_config(body.workflow_config),
         is_builtin=False,
     )
     db.add(t)
@@ -92,6 +109,8 @@ def update_template(template_id: int, body: TemplateUpdate, db: Session = Depend
     data = body.model_dump(exclude_unset=True)
     if "output_sections" in data:
         data["output_sections"] = json.dumps(data["output_sections"])
+    if "workflow_config" in data:
+        data["workflow_config"] = _validate_workflow_config(data["workflow_config"])
     for field, value in data.items():
         setattr(t, field, value)
     db.commit()

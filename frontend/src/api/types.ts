@@ -14,6 +14,7 @@ export interface Template {
   domain_id: number | null;
   prompt_template: string;
   output_sections: string[];
+  workflow_config: string | null;
   is_builtin: boolean;
 }
 
@@ -100,6 +101,34 @@ export interface Summary {
   generated_at: string | null;
 }
 
+export interface WorkflowRunInfo {
+  id: number;
+  status: string;
+  current_step: string | null;
+  workflow_plan: { steps: { agent: string; prompt_override: string | null }[] } | null;
+  error_message: string | null;
+  total_input_tokens: number | null;
+  total_output_tokens: number | null;
+  model_name: string | null;
+  trace_id: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export interface WorkflowStep {
+  id: number;
+  step_name: string;
+  status: 'pending' | 'running' | 'done' | 'error';
+  duration_ms: number | null;
+  critique_score: number | null;
+  attempt: number;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  model_name: string | null;
+  result: Record<string, unknown> | null;
+  created_at: string | null;
+}
+
 export interface LMStudioStatus {
   connected: boolean;
   models: string[];
@@ -111,6 +140,13 @@ export interface LMConfig {
   max_tokens: number;
   max_response_tokens: number;
   global_system_prompt: string;
+  output_mode: 'native' | 'prompted';
+}
+
+export interface TelemetryConfig {
+  enabled: boolean;
+  endpoint: string;
+  capture_content: boolean;
 }
 
 export interface AsrStatus {

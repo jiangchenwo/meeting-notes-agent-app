@@ -6,7 +6,7 @@ services:
       context: ./backend
     # ASR (transcription+diarization) and LM Studio connection settings are
     # configured at runtime from the frontend Settings page and persisted to
-    # the app-data volume (CONFIG_DIR=/data, set in the backend image).
+    # the app-data volume (CONFIG_DIR=/data/config, set in the backend image).
     extra_hosts:
       - "host.docker.internal:host-gateway"   # required on Linux, harmless on macOS/Windows
     volumes:

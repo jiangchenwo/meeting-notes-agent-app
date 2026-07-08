@@ -10,9 +10,20 @@ dependencies = [
     "aiofiles>=23.0.0",
     "python-dotenv>=1.0.0",
     "httpx>=0.27.0",
+    "pydantic-ai-slim[openai]>=2.5,<3",
+    "pydantic>=2.7",
+    "opentelemetry-sdk>=1.30",
+    "opentelemetry-exporter-otlp-proto-http>=1.30",
 ]
 
 [dependency-groups]
+eval = [
+    "pydantic-evals>=2.5.0",
+]
 test = [
     "pytest>=8.0.0",
 ]
+
+[tool.uv]
+# `uv run pytest` works out of the box; Docker opts out via --no-group test.
+default-groups = ["test"]

@@ -24,6 +24,10 @@ DEFAULTS = {
     "max_tokens": 40960,
     "max_response_tokens": 2048,
     "global_system_prompt": DEFAULT_SYSTEM_PROMPT,
+    # Structured-output mode for the agent pipeline: "native" (response_format
+    # json_schema, grammar-enforced in LM Studio) or "prompted" (schema in the
+    # prompt — fallback for engines that reject json_schema).
+    "output_mode": "native",
 }
 
 

@@ -89,6 +89,7 @@ stitch-designs/
 .codex/
 backend/eval/audio/
 backend/eval/history/
+backend/eval/data/
 .mcp.json
 .claude/
 .superpowers/
@@ -237,4 +238,5 @@ poetry.toml
 pyrightconfig.json
 
 docs/
+backend/eval/results/
 data/

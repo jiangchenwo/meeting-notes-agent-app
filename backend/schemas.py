@@ -33,6 +33,7 @@ class TemplateResponse(BaseModel):
     domain_id: Optional[int]
     prompt_template: str
     output_sections: list[str]
+    workflow_config: Optional[str] = None
     is_builtin: bool
     model_config = {"from_attributes": True}
 
@@ -53,6 +54,7 @@ class TemplateCreate(BaseModel):
     domain_id: Optional[int] = None
     prompt_template: str = ""
     output_sections: list[str] = ["summary", "action_items"]
+    workflow_config: Optional[str] = None
 
 
 class TemplateUpdate(BaseModel):
@@ -61,6 +63,7 @@ class TemplateUpdate(BaseModel):
     domain_id: Optional[int] = None
     prompt_template: Optional[str] = None
     output_sections: Optional[list[str]] = None
+    workflow_config: Optional[str] = None
 
 
 class NoteBlockResponse(BaseModel):

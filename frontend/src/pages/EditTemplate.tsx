@@ -28,6 +28,8 @@ export default function EditTemplate() {
   const [domainId, setDomainId] = useState<number | null>(null);
   const [prompt, setPrompt] = useState('');
   const [outputSections, setOutputSections] = useState<string[]>(['summary', 'action_items']);
+  const [workflowConfig, setWorkflowConfig] = useState('');
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [isBuiltin, setIsBuiltin] = useState(false);
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
@@ -44,6 +46,8 @@ export default function EditTemplate() {
         setDomainId(t.domain_id);
         setPrompt(t.prompt_template);
         setOutputSections(t.output_sections);
+        setWorkflowConfig(t.workflow_config ?? '');
+        setAdvancedOpen(Boolean(t.workflow_config));
         setIsBuiltin(t.is_builtin);
       })]).finally(() => setLoading(false));
     } else {
@@ -72,17 +76,36 @@ export default function EditTemplate() {
 
   const handleSave = async () => {
     if (!name.trim()) { setError('Template name is required.'); return; }
+    const wf = workflowConfig.trim();
+    if (wf) {
+      try {
+        JSON.parse(wf);
+      } catch {
+        setError('Workflow config is not valid JSON.');
+        return;
+      }
+    }
     setSaving(true);
     setError('');
     try {
+      const body = {
+        name: name.trim(),
+        description: description.trim(),
+        domain_id: domainId,
+        prompt_template: prompt,
+        output_sections: outputSections,
+        workflow_config: wf || null,
+      };
       if (isNew) {
-        await createTemplate({ name: name.trim(), description: description.trim(), domain_id: domainId, prompt_template: prompt, output_sections: outputSections });
+        await createTemplate(body);
       } else {
-        await updateTemplate(Number(templateId), { name: name.trim(), description: description.trim(), domain_id: domainId, prompt_template: prompt, output_sections: outputSections });
+        await updateTemplate(Number(templateId), body);
       }
       navigate('/management');
-    } catch {
-      setError('Failed to save. Please try again.');
+    } catch (e) {
+      // Backend 422 carries the WorkflowSpec validation detail.
+      const msg = e instanceof Error && e.message ? e.message.slice(0, 400) : '';
+      setError(msg ? `Failed to save: ${msg}` : 'Failed to save. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -233,6 +256,43 @@ export default function EditTemplate() {
                   </label>
                 ))}
               </div>
+            </div>
+
+            {/* Advanced: agent workflow override */}
+            <div className="bg-surface-container-lowest rounded-lg p-space-4">
+              <button
+                onClick={() => setAdvancedOpen((o) => !o)}
+                className="w-full flex items-center justify-between font-headline-md text-headline-md text-on-surface"
+              >
+                <span>Advanced: Agent Workflow</span>
+                <span className="material-symbols-outlined text-[20px] text-on-surface-variant">
+                  {advancedOpen ? 'expand_less' : 'expand_more'}
+                </span>
+              </button>
+              {advancedOpen && (
+                <div className="mt-space-3 flex flex-col gap-space-2">
+                  <p className="font-body-sm text-body-sm text-on-surface-variant">
+                    JSON override for which agents run and which get a quality pass. Leave empty to use the domain default.
+                    Agents: <code className="bg-surface-container rounded px-1">Summarizer</code>,{' '}
+                    <code className="bg-surface-container rounded px-1">ActionItemExtractor</code>,{' '}
+                    <code className="bg-surface-container rounded px-1">DecisionLogger</code>,{' '}
+                    <code className="bg-surface-container rounded px-1">InterviewAgent</code>,{' '}
+                    <code className="bg-surface-container rounded px-1">LectureAgent</code>.
+                  </p>
+                  <textarea
+                    value={workflowConfig}
+                    onChange={(e) => setWorkflowConfig(e.target.value)}
+                    rows={8}
+                    spellCheck={false}
+                    placeholder={`{\n  "steps": ["Summarizer", "DecisionLogger"],\n  "critique_steps": ["Summarizer"],\n  "critique_threshold": 8,\n  "max_retries": 2\n}`}
+                    className="w-full bg-surface border border-outline-variant rounded px-3 py-2 font-body-sm text-[12px] text-on-surface focus:outline-none focus:border-primary focus:ring-0 resize-y transition-colors font-mono leading-relaxed"
+                  />
+                  <p className="font-body-sm text-[11px] text-on-surface-variant">
+                    Steps also accept <code className="bg-surface-container rounded px-1">{'{"agent": "Summarizer", "prompt_override": "…"}'}</code> to
+                    replace the template prompt for that step only. Validated on save.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Placeholder reference */}

@@ -1,5 +1,5 @@
 import { apiFetch } from './client';
-import type { Summary, LMStudioStatus, LMConfig, AsrStatus, AsrConfig, ActionItem } from './types';
+import type { Summary, LMStudioStatus, LMConfig, AsrStatus, AsrConfig, ActionItem, TelemetryConfig } from './types';
 
 export const startSummarization = (noteId: number) =>
   apiFetch<{ status: string }>(`/notes/${noteId}/summarize`, { method: 'POST' });
@@ -23,6 +23,15 @@ export const getLMConfig = () =>
 
 export const updateLMConfig = (cfg: Partial<LMConfig>) =>
   apiFetch<LMConfig>('/settings/llm', {
+    method: 'PUT',
+    body: JSON.stringify(cfg),
+  });
+
+export const getTelemetryConfig = () =>
+  apiFetch<TelemetryConfig>('/settings/telemetry');
+
+export const updateTelemetryConfig = (cfg: Partial<TelemetryConfig>) =>
+  apiFetch<TelemetryConfig & { active: boolean }>('/settings/telemetry', {
     method: 'PUT',
     body: JSON.stringify(cfg),
   });

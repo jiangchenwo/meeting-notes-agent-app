@@ -8,11 +8,12 @@ import { getProjects } from '../api/projects';
 import { getProjectSpeakers, createProjectSpeaker } from '../api/speakers';
 import { getDomains, getTemplates } from '../api/domains';
 import { startTranscription, getTranscription, updateTranscription, updateSegments } from '../api/transcribe';
-import { startSummarization, getSummary, getPromptPreview, getLMStudioStatus, updateSummary } from '../api/summarize';
+import { getSummary, getPromptPreview, getLMStudioStatus, updateSummary } from '../api/summarize';
+import { startWorkflow, getWorkflowRun, getWorkflowSteps } from '../api/workflow';
 import { exportNote, copyText } from '../api/export';
 import Breadcrumb from '../components/Breadcrumb';
 import Select from '../components/Select';
-import type { NoteBlock, Project, ProjectSpeaker, Domain, Template, Transcription, Summary, LMStudioStatus } from '../api/types';
+import type { NoteBlock, Project, ProjectSpeaker, Domain, Template, Transcription, Summary, LMStudioStatus, WorkflowRunInfo, WorkflowStep } from '../api/types';
 import { speakerColor } from '../lib/speakerColor';
 
 function fmtSeconds(s: number): string {
@@ -71,6 +72,8 @@ export default function AudioManagement() {
   const [draftName, setDraftName] = useState('');
   const [transcribeError, setTranscribeError] = useState<string | null>(null);
   const [summarizeError, setSummarizeError] = useState<string | null>(null);
+  const [workflowRun, setWorkflowRun] = useState<WorkflowRunInfo | null>(null);
+  const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([]);
   const [lmStatus, setLmStatus] = useState<LMStudioStatus | null>(null);
   const [doneTasks, setDoneTasks] = useState<Record<number, boolean>>({});
   const [promptPreview, setPromptPreview] = useState<{ system: string; user: string } | null>(null);
@@ -156,11 +159,17 @@ export default function AudioManagement() {
     return () => clearInterval(interval);
   }, [note?.status, id]);
 
-  // Poll while summarizing
+  // Poll while summarizing: note status + per-step workflow progress
   useEffect(() => {
     if (note?.status !== 'summarizing') return;
     const interval = setInterval(async () => {
-      const updated = await getNote(id).catch(() => null);
+      const [updated, runResp, stepsResp] = await Promise.all([
+        getNote(id).catch(() => null),
+        getWorkflowRun(id).catch(() => null),
+        getWorkflowSteps(id).catch(() => null),
+      ]);
+      if (runResp) setWorkflowRun(runResp.run);
+      if (stepsResp) setWorkflowSteps(stepsResp.steps);
       if (!updated) return;
       setNote(updated);
       if (updated.status !== 'summarizing') {
@@ -170,6 +179,8 @@ export default function AudioManagement() {
             setSummary(s);
             setActiveTab('summary');
           });
+        } else if (updated.status === 'error') {
+          setSummarizeError(runResp?.run?.error_message || 'Workflow failed — check that LM Studio is running.');
         }
       }
     }, 2000);
@@ -190,9 +201,12 @@ export default function AudioManagement() {
   const handleSummarize = async () => {
     if (!note) return;
     setSummarizeError(null);
+    setWorkflowRun(null);
+    setWorkflowSteps([]);
     try {
-      await startSummarization(id);
+      await startWorkflow(id);
       setNote((prev) => prev ? { ...prev, status: 'summarizing' } : prev);
+      setActiveTab('summary');
     } catch (err) {
       setSummarizeError(err instanceof Error ? err.message : 'Failed to start summarization');
     }
@@ -678,8 +692,45 @@ export default function AudioManagement() {
                 {isSummarizing && (
                   <div className="flex flex-col items-center justify-center h-full gap-space-4 text-on-surface-variant">
                     <span className="material-symbols-outlined text-[48px] animate-spin text-primary">auto_awesome</span>
-                    <p className="font-body-md text-body-md">Generating summary…</p>
-                    <p className="font-body-sm text-body-sm">The LLM is processing the transcript.</p>
+                    <p className="font-body-md text-body-md">
+                      {workflowRun?.status === 'chunking' ? 'Condensing long transcript…'
+                        : workflowRun?.status === 'critiquing' ? 'Reviewing quality…'
+                        : workflowRun?.status === 'assembling' ? 'Assembling notes…'
+                        : 'Running agent workflow…'}
+                    </p>
+                    {workflowSteps.length > 0 && (
+                      <div className="w-full max-w-md bg-surface-container-lowest border border-outline-variant/50 rounded-lg divide-y divide-outline-variant/30">
+                        {workflowSteps.map((s) => (
+                          <div key={s.id} className="flex items-center gap-3 px-4 py-2">
+                            <span className={`material-symbols-outlined text-[18px] shrink-0 ${
+                              s.status === 'done' ? 'text-primary'
+                                : s.status === 'error' ? 'text-error'
+                                : 'text-on-surface-variant animate-spin'
+                            }`}>
+                              {s.status === 'done' ? 'check_circle' : s.status === 'error' ? 'error' : 'progress_activity'}
+                            </span>
+                            <span className="font-body-sm text-body-sm text-on-surface flex-1 truncate">
+                              {s.step_name}
+                              {s.attempt > 1 && (
+                                <span className="ml-2 font-label-sm text-[10px] text-on-surface-variant bg-surface-container rounded px-1.5 py-0.5">
+                                  retry {s.attempt - 1}
+                                </span>
+                              )}
+                            </span>
+                            <span className="font-label-sm text-[11px] text-on-surface-variant shrink-0">
+                              {s.critique_score != null && `score ${s.critique_score.toFixed(1)}`}
+                              {s.critique_score == null && s.status === 'done' && s.duration_ms != null && `${(s.duration_ms / 1000).toFixed(1)}s`}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {(workflowRun?.total_input_tokens ?? 0) > 0 && (
+                      <p className="font-body-sm text-[11px] text-on-surface-variant">
+                        {workflowRun?.total_input_tokens} in / {workflowRun?.total_output_tokens ?? 0} out tokens
+                        {workflowRun?.model_name ? ` · ${workflowRun.model_name}` : ''}
+                      </p>
+                    )}
                   </div>
                 )}
                 {!isSummarizing && summary?.summary_text && (

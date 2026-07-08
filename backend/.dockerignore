@@ -2,19 +2,18 @@
 .venv/
 **/__pycache__/
 *.pyc
+.pytest_cache/
 
-# Runtime data — lives on the mounted volume, never baked into the image
-notes.db
+# Runtime data — lives on the mounted /data volume, never baked into the image
+notes.db*
 uploads/
 .env
 
-# Host config that would shadow container env vars
+# Host-local runtime settings (config_store JSON) — must not ship in the image
 lm_config.json
-whisper_config.json
+asr_config.json
+telemetry_config.json
 
-# Excluded from published builds: eval datasets, tests, Testing Lab
-eval/
+# Dev-only: tests and the offline eval harness (incl. downloaded datasets)
 tests/
-routers/lab.py
-agents/lab_runner.py
-whisper_utils.py
+eval/

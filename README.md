@@ -1,6 +1,6 @@
 # Meeting Notes Agent
 
-A local-first, offline-capable web app that transcribes audio recordings and generates structured meeting notes using open-source, self-hosted AI. No cloud dependencies — all audio and data stays on your machine.
+A local-first web app that transcribes audio recordings and turns them into structured meeting notes with self-hosted AI. Everything — audio, transcripts, notes, and the models — stays on your machine.
 
 ## What it does
 
@@ -10,83 +10,182 @@ Upload Audio → Select Project + Domain + Template → Transcribe → Summarize
 
 1. Drop in an audio file (MP3, WAV, M4A up to 2 GB)
 2. Assign it to a **project** and pick a **domain** (General, Education, Healthcare, Interview, Project)
-3. A host-native [ASR service](asr-service/) transcribes it locally, with optional speaker diarization
-4. A local LLM generates a structured summary, action items, and domain-specific suggestions
+3. The local ASR service transcribes it, with optional speaker diarization
+4. A local LLM runs a multi-agent workflow that writes a summary, action items, and domain-specific suggestions
 5. Review, edit, and export the notes as Markdown or plain text
 
 ## Features
 
-**Now**
+**AI agents write your notes** — each transcript runs a pipeline of focused agents on your local LLM:
 
-- Local ASR transcription with optional speaker diarization — timestamped and editable
-- AI note generation — summary, action items, and domain-specific suggestions
-- Agentic multi-agent pipeline (orchestrator → agents → critic → verifiers) via API
-- Projects with shared system prompt & knowledge base; custom domains & templates
-- Note management — full-text search, filters, color labels, drag-to-reorder, bulk ops
-- Markdown / plain-text export; in-app ASR service + LM Studio configuration
+- **Multi-agent pipeline** — a Summarizer, extractors for action items and decisions, and domain agents for interviews and lectures
+- **Self-checking** — a critic agent grades each draft and retries weak steps, keeping the best result
+- **Live progress** — watch every agent's status, score, and duration
+- **Customizable** — set the agent steps, critique targets, and prompts per template
+- **Project context** — a shared system prompt and knowledge base feed every agent
 
-**Upcoming**
+**Also:** local transcription with speaker diarization · note search, labels, and bulk actions · Markdown / text export · all config in-app (no `.env`) · optional [Phoenix](https://docs.arize.com/phoenix) tracing
 
-- Wire the agentic workflow into the note page (today it runs via API)
-- RAG / semantic search across all notes
-- Real-time microphone transcription
-- Calendar, webhook (Notion / Obsidian), and folder-watch integrations
-- Multi-user / auth
+**Roadmap:** RAG / semantic search across notes · real-time microphone transcription · calendar, webhook (Notion / Obsidian), and folder-watch integrations · multi-user & auth
 
-## Agentic workflow
+## Getting started
 
-Instead of a single "summarize everything" LLM call, the app runs a sequence of focused agents — each with one job and a tight prompt. A deterministic orchestrator ([`agents/orchestrator.py`](backend/agents/orchestrator.py)) selects the agents based on domain, runs them serially (LM Studio loads one model at a time), then a critic agent reviews selected steps and retries any that fall below a quality threshold.
+The app runs in **Docker** (frontend + backend via `docker compose`). Two things stay on the host: **LM Studio** and the **ASR service** (it needs direct GPU access).
 
-### Architecture
+### Prerequisites
 
-```
-Orchestrator (rule-based, no extra LLM call)
-    │
-    ├── Chunking phase  (only when the transcript exceeds the context window)
-    │   └── Map-reduce Summarizer over overlapping chunks → condensed transcript
-    │
-    ├── Extraction phase  (serial — one model at a time)
-    │   ├── Summarizer          — narrative summary in Markdown
-    │   ├── ActionItemExtractor — [{task, owner, deadline, priority}]
-    │   ├── DecisionLogger      — [{decision, rationale, made_by}]
-    │   └── Domain agent        — domain-specific structured output
-    │
-    ├── Critique phase
-    │   └── Critic              — scores output 1–10, flags gaps, rewrites if needed
-    │       └── Retry loop      — re-runs the step with critique notes until threshold met
-    │
-    ├── Verification phase  (non-LLM)
-    │   ├── SchemaVerifier      — checks each agent's output shape
-    │   └── RiskClassifier      — flags risky/sensitive content by domain
-    │
-    └── Assembly  (pure Python, no LLM call)
-        └── Writes Summary record + raw_sections_json (incl. schema/risk results)
+- Docker (Desktop on Mac/Windows, or Engine + the compose plugin on Linux)
+- [LM Studio](https://lmstudio.ai) running with a model loaded (default port `1234`)
+- Python 3.12+ and [uv](https://docs.astral.sh/uv/) — for the host-native ASR service
+
+### 1. Start the ASR service (host-native)
+
+```bash
+cd asr-service
+uv sync
+./start.sh    # serves on http://localhost:9000
 ```
 
-### Domain routing
+See [`asr-service/README.md`](asr-service/README.md) for model caching and details.
 
-Each domain activates a different set of agents and critique settings ([`agents/workflows.py`](backend/agents/workflows.py)). General is the baseline fallback for any unmatched domain:
+### 2. Start the app
 
+```bash
+make up      # builds both images and starts the app at http://localhost:8080
+make logs    # tail logs
+make down    # stop
+```
 
-| Domain         | Agents                                          | Critiqued step | Threshold |
-| ---------------- | ------------------------------------------------- | ---------------- | ----------- |
-| **General**    | Summarizer, ActionItemExtractor                 | Summarizer     | 8/10      |
-| **Education**  | Summarizer, LectureAgent, ActionItemExtractor   | Summarizer     | 8/10      |
-| **Healthcare** | Summarizer, ActionItemExtractor                 | Summarizer     | 8/10      |
-| **Interview**  | Summarizer, InterviewAgent                      | InterviewAgent | 8/10      |
-| **Project**    | Summarizer, ActionItemExtractor, DecisionLogger | Summarizer     | 8/10      |
+(These are thin wrappers around `docker compose` — `docker compose up -d --build` works too.)
 
-### Domain-specific outputs
+### 3. Verify connections
 
-Domain agents extract structured data surfaced in the **Suggestions** tab:
+Open http://localhost:8080 → **Settings**. The defaults already point at your host machine for both LM Studio (`:1234`) and the ASR service (`:9000`) — click **Test connection** on each. All connection settings (base URLs, model, token limits, system prompt) live on this page.
 
-- **Project** — explicit decisions with rationale, alongside the action items
-- **Education** — key concepts with definitions, learning objectives, quiz questions
-- **Interview** — red flags, green flags, candidate highlights, suggested follow-up questions
+All app data — the database, uploaded audio, and settings — persists on a single Docker volume and survives container recreation; data from an earlier version is migrated automatically on startup.
 
-### Template overrides
+### Deploying to another machine
 
-A template can override the workflow for any note it's assigned to via the `workflow_config` JSON field:
+Publish multi-arch images to a registry, then pull them on the target host (the ASR service must still be set up host-native there):
+
+```bash
+make buildx REGISTRY=ghcr.io/you TAG=1.0    # build + push (linux/amd64 + arm64)
+make pull up REGISTRY=ghcr.io/you TAG=1.0   # on the target host
+```
+
+### Development (without Docker)
+
+For hot reload, run the backend and frontend directly (Node.js 20+ required):
+
+```bash
+cd backend && uv sync
+uv run uvicorn main:app --reload   # http://localhost:8000
+
+cd frontend && npm install
+npm run dev                        # http://localhost:5173, proxies /api → :8000
+```
+
+In this mode, point Settings → ASR / LM Studio at `http://localhost:9000` and `http://localhost:1234/v1`. The module map, data model, API surface, pipeline internals, and eval harness are documented in [backend/README.md](backend/README.md).
+
+## How to use
+
+### 1. Upload a recording
+
+On the **Home** page, drag-and-drop an audio file (MP3, WAV, M4A) onto the upload zone, or click to browse. The file appears as a note block with status **Pending**.
+
+### 2. Assign context
+
+Click the note block's name to open it. In the right panel, assign:
+
+- **Project** — groups related recordings and injects shared context into the LLM
+- **Domain** — selects which agents run (General, Education, Healthcare, Interview, Project)
+- **Template** — selects the prompt that drives the summary output
+
+### 3. Transcribe
+
+Click **Transcribe**. When it finishes, the timestamped transcript appears in the Segments and Full Text tabs — speakers can be renamed, and the Full Text tab is editable before summarizing.
+
+### 4. Generate notes
+
+Click **Summarize** (it becomes **Re-summarize** once a summary exists). The Summary tab shows live per-agent progress — each step with its status, retries, quality score, and duration — then switches to the finished notes. Use **Preview Prompt** to inspect the exact prompt before running.
+
+Results appear across tabs, each editable inline:
+
+- **Summary** — structured narrative in Markdown
+- **Action Items** — checklist with owner, deadline, and priority
+- **Suggestions** — domain-specific output (see table below)
+
+### 5. Export
+
+Use the **Export** button on any note to download it as Markdown or plain text, or the copy button on each tab to paste into Notion, Obsidian, or any other tool.
+
+### Managing projects
+
+Open **Projects** to create and organize projects. Inside a project:
+
+- **Overview** — see all recordings; rename or update the description
+- **System Prompt** — a persona instruction applied to every note in this project (e.g. "Focus on engineering decisions and ticket references")
+- **Knowledge Base** — Markdown context (team members, glossary, recurring topics) injected automatically when generating notes
+
+### Settings
+
+Everything is configured in-app and persists across restarts: the ASR service URL, the LM Studio endpoint (plus model, token limits, system prompt, structured-output mode), and the optional tracing toggle. **Test connection** buttons verify each service is reachable.
+
+## How it works
+
+Instead of one "summarize everything" prompt, each note runs a short **pipeline of focused agents** built on [Pydantic AI](https://ai.pydantic.dev). Every agent has a single job and a narrow prompt, a critic scores the important outputs against a rubric, and any step that falls short is retried with the critique as feedback. Everything runs serially against your local LM Studio endpoint — one model, one call at a time.
+
+### The agents
+
+| Agent | Job | Output |
+| --- | --- | --- |
+| **Summarizer** | The narrative summary — one section per topic, keeping the names, numbers, decisions, and outcomes | Markdown text |
+| **ActionItemExtractor** | Concrete tasks, each with an owner, deadline, and priority | Structured list |
+| **DecisionLogger** | Explicit decisions and the rationale behind them | Structured list |
+| **InterviewAgent** | Candidate highlights, red/green flags, suggested follow-up questions | Structured |
+| **LectureAgent** | Key concepts, learning objectives, assignments, quiz questions | Structured |
+| **Critic** | Scores another agent's output 0–10 against a rubric and returns specific revision advice — it grades, it never rewrites | Score + issues |
+
+The Summarizer always emits plain Markdown; the extractor and analysis agents return schema-constrained JSON, so their fields map straight to the UI tabs.
+
+### The pipeline
+
+```
+Transcript
+  │
+  ├─ Chunk        only if it exceeds the model's context window:
+  │               summarize each chunk, then condense into one transcript
+  │
+  ├─ Extract      serial run of the domain's agents:
+  │               Summarizer → ActionItemExtractor → DecisionLogger / domain agent
+  │
+  ├─ Critique     the Critic scores selected steps; a step below the threshold
+  │  + retry      is re-run with the critique in its prompt (up to max_retries).
+  │               The best-scoring attempt is kept — never a worse retry.
+  │
+  ├─ Verify       no LLM: schema-shape checks + domain risk flags
+  │               (e.g. a "needs review" flag on medical/clinical content)
+  │
+  └─ Assemble     pure Python: Summary · Action Items · Suggestions
+```
+
+The critic scores four dimensions — coverage (0–4), accuracy (0–3), specificity (0–2), and structure (0–1) — and the total is recomputed in Python from those parts, so the model can't inflate its own grade. Below the domain's threshold the step retries with the specific misses named as feedback; a long meeting that comes back with a too-short summary also gets an explicit "expand this" note.
+
+### What each domain extracts
+
+The note's domain decides which agents run alongside the Summarizer, and which outputs get a critique pass:
+
+| Domain         | Beyond the summary                                                           | Quality-checked                |
+| -------------- | ---------------------------------------------------------------------------- | ------------------------------ |
+| **General**    | Action items, decision log                                                   | Summary                        |
+| **Education**  | Key concepts, learning objectives, assignments, quiz questions, action items | Summary + lecture extraction   |
+| **Healthcare** | Action items                                                                 | Summary + action items         |
+| **Interview**  | Candidate highlights, red/green flags, suggested follow-up questions         | Summary + candidate assessment |
+| **Project**    | Action items, decision log with rationale                                    | Summary                        |
+
+### Customizing the workflow
+
+A template can override the agent workflow for any note it's assigned to — edit **Advanced: Agent Workflow** in the template editor:
 
 ```json
 {
@@ -97,123 +196,42 @@ A template can override the workflow for any note it's assigned to via the `work
 }
 ```
 
-## Getting started
+The four fields:
 
-### Prerequisites
+- **`steps`** — the agents to run, in order (1–8). A step can be a bare name or `{"agent": "Summarizer", "prompt_override": "…"}` to swap the prompt for that step only.
+- **`critique_steps`** — which of those steps the Critic reviews. Must be a subset of `steps`.
+- **`critique_threshold`** — the 0–10 score a step must reach; below it, the step retries with feedback.
+- **`max_retries`** — how many extra attempts a below-threshold step gets (0–3).
 
-- Node.js 20+
-- Python 3.11+
-- [uv](https://docs.astral.sh/uv/) for Python package management
-- The host-native [`asr-service`](asr-service/) running for transcription + diarization (see its README; Mac/Metal, can't be containerized)
-- [LM Studio](https://lmstudio.ai) with a model loaded
+Invalid configs are rejected on save; anything omitted falls back to the domain default.
 
-### Backend
+### Tracing (optional)
 
-```bash
-cd backend
-uv sync
-uv run uvicorn main:app --reload   # http://localhost:8000
-```
-
-### Frontend
+Every AI run can emit traces — prompts, outputs, per-step latency and token usage — to a local Arize Phoenix instance. Everything stays on your machine.
 
 ```bash
-cd frontend
-npm install
-npm run dev   # http://localhost:5173
+uvx arize-phoenix serve   # Phoenix UI at http://localhost:6006
 ```
 
-### ASR service
+Then enable **Settings → Tracing (Phoenix)** in the app (no restart needed). A "capture content" toggle omits prompt/response text from traces for sensitive recordings. When the app runs in Docker, set the endpoint to `http://host.docker.internal:6006` so the container reaches Phoenix on your host.
 
-Transcription + diarization run in a separate host-native service (Metal can't be
-containerized on Mac). Start it on its default port `:9000`:
+## Repository layout
 
-```bash
-cd asr-service
-uv sync
-./start.sh    # serves on http://localhost:9000
-```
-
-See [`asr-service/README.md`](asr-service/README.md) for model caching and details.
-
-`notes.db`, `uploads/`, and config JSON are created automatically at the repo root on first run. In Docker they live on a single persistent `/data` volume, split into `db/`, `uploads/`, and `config/` subdirectories (an existing volume from an earlier version is migrated into this layout automatically on startup).
-
-Connection settings for the **ASR service** and **LM Studio** (base URLs, model,
-token limits, system prompt) are configured from the in-app **Settings** page —
-no `.env` required. They persist to disk (under `CONFIG_DIR` — `/data/config` on
-the Docker volume) and survive container recreation.
-
-## How to use
-
-### 1. Upload a recording
-
-Go to the **Home** page and drag-and-drop an audio file (MP3, WAV, M4A) onto the upload zone, or click to browse. The file appears as a note block with status **Pending**.
-
-### 2. Assign context
-
-Click the note block's name to open it. In the right panel, assign:
-
-- **Project** — groups related recordings and injects shared context into the LLM
-- **Domain** — selects the domain workflow (General, Education, Healthcare, Interview, Project)
-- **Template** — selects which prompt drives the summary output
-
-### 3. Transcribe
-
-Click **Transcribe**. The status changes to **Transcribing** while the ASR service processes the audio locally (optionally labelling speakers). When done it switches to **Transcribed** and the timestamped transcript appears in the Segments and Full Text tabs.
-
-You can edit the transcript directly on the Full Text tab before summarizing.
-
-### 4. Generate notes
-
-Click **Summarize** (it becomes **Re-summarize** once a summary exists). The status changes to **Summarizing** while the LLM runs; the page polls and switches to the **Summary** tab when it finishes. Use **Preview Prompt** to inspect the exact system and user messages first.
-
-Results appear across tabs, each editable inline:
-
-- **Summary** — structured narrative in Markdown
-- **Action Items** — checklist with owner, deadline, and priority
-- **Suggestions** — domain-specific output (decisions, concepts, interview flags, etc.)
-
-The full multi-agent pipeline — orchestrator, critic retries, and schema/risk verification — runs via the workflow API (`POST /api/notes/{id}/run-workflow`); wiring it into the note page UI is on the roadmap.
-
-### 5. Export
-
-Use the **Export** button on any note to download as Markdown or plain text. Individual copy buttons on each tab let you paste directly into Notion, Obsidian, or any other tool.
-
-### Managing projects
-
-Open **Projects** to create and organize projects. Inside a project:
-
-- **Overview** — see all recordings; click the pencil icon to rename or update the description
-- **System Prompt** — write a persona instruction that overrides the default assistant for this project (e.g. "Focus on engineering decisions and ticket references")
-- **Knowledge Base** — add structured Markdown context (team members, glossary, recurring topics) that the LLM injects automatically when generating notes
-
-### Configuring the ASR service and the LLM
-
-Open **Settings** to set the ASR service URL and the LM Studio endpoint (plus model, token limits, and system prompt). Use **Test connection** on each to verify they're reachable before running a workflow. These settings are saved server-side and persist across restarts — no `.env` needed.
-
----
+| Path                         | What it is                                                                                                     |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| [backend/](backend/)         | FastAPI API, agentic pipeline, eval harness —**[backend/README.md](backend/README.md)** is the full reference |
+| [frontend/](frontend/)       | React + TypeScript + Vite web app                                                                              |
+| [asr-service/](asr-service/) | Host-native transcription + diarization service (own README)                                                   |
+| [docs/](docs/)               | Benchmark & methodology notes ([eval-agentic-vs-baseline.md](docs/eval-agentic-vs-baseline.md))                |
 
 ## Stack
 
-
-| Layer         | Choice                                       |
-| --------------- | ---------------------------------------------- |
-| Frontend      | React + TypeScript + Vite                    |
-| Styling       | Tailwind CSS v3 (Material You green palette) |
-| Routing       | React Router v6                              |
-| Backend       | Python + FastAPI                             |
-| Database      | SQLite                                       |
+| Layer         | Choice                                                                |
+| ------------- | ---------------------------------------------------------------------- |
+| Frontend      | React + TypeScript + Vite, Tailwind CSS                               |
+| Backend       | Python + FastAPI, SQLite                                              |
 | Transcription | Host-native ASR service — MLX-Whisper (Metal) + pyannote diarization |
-| LLM           | LM Studio (OpenAI-compatible local endpoint) |
-
-## Design principles
-
-- **Offline-first** — everything runs locally; no audio or data leaves the machine
-- **Block-based UI** — each audio file is an independent unit with its own status
-- **One agent, one job** — each LLM call has a single focused task and a tight prompt
-- **Prompt transparency** — users can inspect the exact prompt sent to the LLM
-- **LLM-agnostic** — uses the OpenAI-compatible endpoint; swap any local model
-- **Backwards-compatible** — the legacy single-call summarizer still works alongside the workflow
+| LLM           | LM Studio (or any OpenAI-compatible local endpoint)                   |
 
 ## License
 

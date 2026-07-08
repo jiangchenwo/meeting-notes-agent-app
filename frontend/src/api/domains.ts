@@ -29,6 +29,7 @@ export const createTemplate = (body: {
   domain_id?: number | null;
   prompt_template?: string;
   output_sections?: string[];
+  workflow_config?: string | null;
 }) => apiFetch<Template>('/templates', { method: 'POST', body: JSON.stringify(body) });
 
 export const updateTemplate = (
@@ -39,6 +40,7 @@ export const updateTemplate = (
     domain_id: number | null;
     prompt_template: string;
     output_sections: string[];
+    workflow_config: string | null;
   }>,
 ) => apiFetch<Template>(`/templates/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
 

@@ -32,6 +32,13 @@ with engine.connect() as _conn:
         "ALTER TABLE summaries ADD COLUMN raw_sections_json TEXT",
         "ALTER TABLE projects ADD COLUMN color VARCHAR",
         "ALTER TABLE projects ADD COLUMN icon VARCHAR",
+        "ALTER TABLE workflow_runs ADD COLUMN total_input_tokens INTEGER",
+        "ALTER TABLE workflow_runs ADD COLUMN total_output_tokens INTEGER",
+        "ALTER TABLE workflow_runs ADD COLUMN model_name VARCHAR",
+        "ALTER TABLE workflow_runs ADD COLUMN trace_id VARCHAR",
+        "ALTER TABLE workflow_step_results ADD COLUMN input_tokens INTEGER",
+        "ALTER TABLE workflow_step_results ADD COLUMN output_tokens INTEGER",
+        "ALTER TABLE workflow_step_results ADD COLUMN model_name VARCHAR",
     ]:
         try:
             _conn.execute(text(_stmt))
@@ -78,7 +85,16 @@ with engine.connect() as _conn:
     ))
     _conn.commit()
 
+import telemetry
+
+telemetry.configure_telemetry()
+
 app = FastAPI(title="Meeting Notes Agent API", version="1.0.0")
+
+
+@app.on_event("shutdown")
+def _flush_telemetry():
+    telemetry.shutdown_telemetry()
 
 app.add_middleware(
     CORSMiddleware,
