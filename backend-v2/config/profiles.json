@@ -1,0 +1,61 @@
+{
+  "schema_version": "runtime-profiles-v1",
+  "profiles": [
+    {
+      "name": "narrative_reasoned",
+      "reasoning": "reasoned",
+      "output_mode": "text",
+      "temperature": 1.0,
+      "top_p": 0.95,
+      "top_k": 64,
+      "max_tokens": 8192,
+      "parse_retries": 0,
+      "max_tool_rounds": 0,
+      "max_tool_calls": 0,
+      "max_tool_result_tokens": 0,
+      "status": "candidate"
+    },
+    {
+      "name": "tool_reasoned",
+      "reasoning": "reasoned",
+      "output_mode": "text",
+      "temperature": 0.7,
+      "top_p": 0.95,
+      "top_k": 64,
+      "max_tokens": 8192,
+      "parse_retries": 1,
+      "max_tool_rounds": 2,
+      "max_tool_calls": 64,
+      "max_tool_result_tokens": 4096,
+      "status": "candidate"
+    },
+    {
+      "name": "structured_off",
+      "reasoning": "off",
+      "output_mode": "structured",
+      "temperature": 0.2,
+      "top_p": 0.9,
+      "top_k": 40,
+      "max_tokens": 8192,
+      "parse_retries": 1,
+      "max_tool_rounds": 0,
+      "max_tool_calls": 0,
+      "max_tool_result_tokens": 0,
+      "status": "candidate"
+    },
+    {
+      "name": "critic_structured_off",
+      "reasoning": "off",
+      "output_mode": "structured",
+      "temperature": 0.2,
+      "top_p": 0.9,
+      "top_k": 40,
+      "max_tokens": 8192,
+      "parse_retries": 1,
+      "max_tool_rounds": 1,
+      "max_tool_calls": 3,
+      "max_tool_result_tokens": 3072,
+      "status": "candidate"
+    }
+  ]
+}

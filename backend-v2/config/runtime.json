@@ -1,0 +1,25 @@
+{
+  "schema_version": "runtime-settings-v1",
+  "provider": "lm_studio_openai",
+  "inference_base_url": "http://localhost:1234/v1",
+  "control_base_url": "http://localhost:1234",
+  "control_timeout_seconds": 10,
+  "inference_timeout_seconds": 240,
+  "profiles_path": "profiles.json",
+  "model": {
+    "model_key": "google/gemma-4-26b-a4b-qat",
+    "instance_id": null,
+    "architecture": "gemma4",
+    "format": "mlx",
+    "quantization_name": "4bit",
+    "bits_per_weight": 4,
+    "loaded_context": 40960
+  },
+  "context": {
+    "hard_context": 40960,
+    "initial_prompt_limit": 24576,
+    "generation_limit": 8192,
+    "tool_result_limit": 4096,
+    "safety_margin": 4096
+  }
+}
