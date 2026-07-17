@@ -300,10 +300,11 @@ def test_critic_failure_is_typed_and_never_fabricated() -> None:
     assert len(provider.payloads) == 2
 
 
-def test_provider_generation_occurs_only_in_gateway_or_probe_script() -> None:
+def test_provider_generation_occurs_only_in_approved_gateways_or_probe_script() -> None:
     offenders: list[str] = []
     allowed = {
         ROOT / "src" / "notes_agent_v2" / "runtime" / "gateway.py",
+        ROOT / "src" / "notes_agent_v2" / "evaluation" / "judges.py",
         ROOT / "scripts" / "probe_lm_studio.py",
     }
     for path in [*(ROOT / "src").rglob("*.py"), *(ROOT / "scripts").rglob("*.py")]:

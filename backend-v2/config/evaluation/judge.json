@@ -1,0 +1,13 @@
+{
+  "schema_version": "judge-settings-v1",
+  "provider": "disabled",
+  "model": null,
+  "base_url": null,
+  "timeout_seconds": 30,
+  "min_interval_seconds": 0,
+  "max_cost_usd": 0,
+  "input_cost_per_million": 0,
+  "output_cost_per_million": 0,
+  "temperature": 0,
+  "rubric": "issues-v1"
+}
