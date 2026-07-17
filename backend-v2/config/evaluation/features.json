@@ -1,0 +1,432 @@
+{
+  "schema_version": "feature-registry-v1",
+  "features": [
+    {
+      "feature_id": "eval.benchmark_importers",
+      "hypothesis": "The eval.benchmark_importers treatment satisfies its deterministic conformance gate without privacy or integrity failures.",
+      "baseline": "unvalidated or provisional behavior",
+      "treatment": "typed, fail-closed evaluation behavior",
+      "suite": "phase-02-offline-conformance",
+      "metrics": [
+        {
+          "metric": "conformance_rate",
+          "operation": "gte",
+          "threshold": 1
+        }
+      ],
+      "trace_requirements": [
+        "stage",
+        "metric",
+        "artifact"
+      ],
+      "seeds": [
+        41
+      ],
+      "max_requests": 0,
+      "max_cost_usd": 0,
+      "invalidation_conditions": [
+        "missing_trace",
+        "fingerprint_mismatch",
+        "privacy_failure",
+        "artifact_corruption"
+      ],
+      "report_owner": "phase-02"
+    },
+    {
+      "feature_id": "eval.development_gold_builder",
+      "hypothesis": "The eval.development_gold_builder treatment satisfies its deterministic conformance gate without privacy or integrity failures.",
+      "baseline": "unvalidated or provisional behavior",
+      "treatment": "typed, fail-closed evaluation behavior",
+      "suite": "phase-02-offline-conformance",
+      "metrics": [
+        {
+          "metric": "conformance_rate",
+          "operation": "gte",
+          "threshold": 1
+        }
+      ],
+      "trace_requirements": [
+        "stage",
+        "metric",
+        "artifact"
+      ],
+      "seeds": [
+        41
+      ],
+      "max_requests": 0,
+      "max_cost_usd": 0,
+      "invalidation_conditions": [
+        "missing_trace",
+        "fingerprint_mismatch",
+        "privacy_failure",
+        "artifact_corruption"
+      ],
+      "report_owner": "phase-02"
+    },
+    {
+      "feature_id": "eval.feature_registry",
+      "hypothesis": "The eval.feature_registry treatment satisfies its deterministic conformance gate without privacy or integrity failures.",
+      "baseline": "unvalidated or provisional behavior",
+      "treatment": "typed, fail-closed evaluation behavior",
+      "suite": "phase-02-offline-conformance",
+      "metrics": [
+        {
+          "metric": "conformance_rate",
+          "operation": "gte",
+          "threshold": 1
+        }
+      ],
+      "trace_requirements": [
+        "stage",
+        "metric",
+        "artifact"
+      ],
+      "seeds": [
+        41
+      ],
+      "max_requests": 0,
+      "max_cost_usd": 0,
+      "invalidation_conditions": [
+        "missing_trace",
+        "fingerprint_mismatch",
+        "privacy_failure",
+        "artifact_corruption"
+      ],
+      "report_owner": "phase-02"
+    },
+    {
+      "feature_id": "eval.safe_tracing",
+      "hypothesis": "The eval.safe_tracing treatment satisfies its deterministic conformance gate without privacy or integrity failures.",
+      "baseline": "unvalidated or provisional behavior",
+      "treatment": "typed, fail-closed evaluation behavior",
+      "suite": "phase-02-offline-conformance",
+      "metrics": [
+        {
+          "metric": "conformance_rate",
+          "operation": "gte",
+          "threshold": 1
+        }
+      ],
+      "trace_requirements": [
+        "stage",
+        "metric",
+        "artifact"
+      ],
+      "seeds": [
+        41
+      ],
+      "max_requests": 0,
+      "max_cost_usd": 0,
+      "invalidation_conditions": [
+        "missing_trace",
+        "fingerprint_mismatch",
+        "privacy_failure",
+        "artifact_corruption"
+      ],
+      "report_owner": "phase-02"
+    },
+    {
+      "feature_id": "eval.atomic_bundles",
+      "hypothesis": "The eval.atomic_bundles treatment satisfies its deterministic conformance gate without privacy or integrity failures.",
+      "baseline": "unvalidated or provisional behavior",
+      "treatment": "typed, fail-closed evaluation behavior",
+      "suite": "phase-02-offline-conformance",
+      "metrics": [
+        {
+          "metric": "conformance_rate",
+          "operation": "gte",
+          "threshold": 1
+        }
+      ],
+      "trace_requirements": [
+        "stage",
+        "metric",
+        "artifact"
+      ],
+      "seeds": [
+        41
+      ],
+      "max_requests": 0,
+      "max_cost_usd": 0,
+      "invalidation_conditions": [
+        "missing_trace",
+        "fingerprint_mismatch",
+        "privacy_failure",
+        "artifact_corruption"
+      ],
+      "report_owner": "phase-02"
+    },
+    {
+      "feature_id": "eval.known_answer_metrics",
+      "hypothesis": "The eval.known_answer_metrics treatment satisfies its deterministic conformance gate without privacy or integrity failures.",
+      "baseline": "unvalidated or provisional behavior",
+      "treatment": "typed, fail-closed evaluation behavior",
+      "suite": "phase-02-offline-conformance",
+      "metrics": [
+        {
+          "metric": "conformance_rate",
+          "operation": "gte",
+          "threshold": 1
+        }
+      ],
+      "trace_requirements": [
+        "stage",
+        "metric",
+        "artifact"
+      ],
+      "seeds": [
+        41
+      ],
+      "max_requests": 0,
+      "max_cost_usd": 0,
+      "invalidation_conditions": [
+        "missing_trace",
+        "fingerprint_mismatch",
+        "privacy_failure",
+        "artifact_corruption"
+      ],
+      "report_owner": "phase-02"
+    },
+    {
+      "feature_id": "eval.two_direction_qag",
+      "hypothesis": "The eval.two_direction_qag treatment satisfies its deterministic conformance gate without privacy or integrity failures.",
+      "baseline": "unvalidated or provisional behavior",
+      "treatment": "typed, fail-closed evaluation behavior",
+      "suite": "phase-02-offline-conformance",
+      "metrics": [
+        {
+          "metric": "conformance_rate",
+          "operation": "gte",
+          "threshold": 1
+        }
+      ],
+      "trace_requirements": [
+        "stage",
+        "metric",
+        "artifact"
+      ],
+      "seeds": [
+        41
+      ],
+      "max_requests": 0,
+      "max_cost_usd": 0,
+      "invalidation_conditions": [
+        "missing_trace",
+        "fingerprint_mismatch",
+        "privacy_failure",
+        "artifact_corruption"
+      ],
+      "report_owner": "phase-02"
+    },
+    {
+      "feature_id": "eval.configurable_judge",
+      "hypothesis": "The eval.configurable_judge treatment satisfies its deterministic conformance gate without privacy or integrity failures.",
+      "baseline": "unvalidated or provisional behavior",
+      "treatment": "typed, fail-closed evaluation behavior",
+      "suite": "phase-02-offline-conformance",
+      "metrics": [
+        {
+          "metric": "conformance_rate",
+          "operation": "gte",
+          "threshold": 1
+        }
+      ],
+      "trace_requirements": [
+        "stage",
+        "metric",
+        "artifact"
+      ],
+      "seeds": [
+        41
+      ],
+      "max_requests": 0,
+      "max_cost_usd": 0,
+      "invalidation_conditions": [
+        "missing_trace",
+        "fingerprint_mismatch",
+        "privacy_failure",
+        "artifact_corruption"
+      ],
+      "report_owner": "phase-02"
+    },
+    {
+      "feature_id": "eval.gold_audit",
+      "hypothesis": "The eval.gold_audit treatment satisfies its deterministic conformance gate without privacy or integrity failures.",
+      "baseline": "unvalidated or provisional behavior",
+      "treatment": "typed, fail-closed evaluation behavior",
+      "suite": "phase-02-offline-conformance",
+      "metrics": [
+        {
+          "metric": "conformance_rate",
+          "operation": "gte",
+          "threshold": 1
+        }
+      ],
+      "trace_requirements": [
+        "stage",
+        "metric",
+        "artifact"
+      ],
+      "seeds": [
+        41
+      ],
+      "max_requests": 0,
+      "max_cost_usd": 0,
+      "invalidation_conditions": [
+        "missing_trace",
+        "fingerprint_mismatch",
+        "privacy_failure",
+        "artifact_corruption"
+      ],
+      "report_owner": "phase-02"
+    },
+    {
+      "feature_id": "eval.atomic_activation",
+      "hypothesis": "The eval.atomic_activation treatment satisfies its deterministic conformance gate without privacy or integrity failures.",
+      "baseline": "unvalidated or provisional behavior",
+      "treatment": "typed, fail-closed evaluation behavior",
+      "suite": "phase-02-offline-conformance",
+      "metrics": [
+        {
+          "metric": "conformance_rate",
+          "operation": "gte",
+          "threshold": 1
+        }
+      ],
+      "trace_requirements": [
+        "stage",
+        "metric",
+        "artifact"
+      ],
+      "seeds": [
+        41
+      ],
+      "max_requests": 0,
+      "max_cost_usd": 0,
+      "invalidation_conditions": [
+        "missing_trace",
+        "fingerprint_mismatch",
+        "privacy_failure",
+        "artifact_corruption"
+      ],
+      "report_owner": "phase-02"
+    },
+    {
+      "feature_id": "eval.paired_runner",
+      "hypothesis": "The eval.paired_runner treatment satisfies its deterministic conformance gate without privacy or integrity failures.",
+      "baseline": "unvalidated or provisional behavior",
+      "treatment": "typed, fail-closed evaluation behavior",
+      "suite": "phase-02-offline-conformance",
+      "metrics": [
+        {
+          "metric": "conformance_rate",
+          "operation": "gte",
+          "threshold": 1
+        }
+      ],
+      "trace_requirements": [
+        "stage",
+        "metric",
+        "artifact"
+      ],
+      "seeds": [
+        41
+      ],
+      "max_requests": 0,
+      "max_cost_usd": 0,
+      "invalidation_conditions": [
+        "missing_trace",
+        "fingerprint_mismatch",
+        "privacy_failure",
+        "artifact_corruption"
+      ],
+      "report_owner": "phase-02"
+    },
+    {
+      "feature_id": "eval.reproducible_reporting",
+      "hypothesis": "The eval.reproducible_reporting treatment satisfies its deterministic conformance gate without privacy or integrity failures.",
+      "baseline": "unvalidated or provisional behavior",
+      "treatment": "typed, fail-closed evaluation behavior",
+      "suite": "phase-02-offline-conformance",
+      "metrics": [
+        {
+          "metric": "conformance_rate",
+          "operation": "gte",
+          "threshold": 1
+        }
+      ],
+      "trace_requirements": [
+        "stage",
+        "metric",
+        "artifact"
+      ],
+      "seeds": [
+        41
+      ],
+      "max_requests": 0,
+      "max_cost_usd": 0,
+      "invalidation_conditions": [
+        "missing_trace",
+        "fingerprint_mismatch",
+        "privacy_failure",
+        "artifact_corruption"
+      ],
+      "report_owner": "phase-02"
+    },
+    {
+      "feature_id": "domain.strict_contracts",
+      "hypothesis": "Frozen extra-forbid contracts reject every authored invariant violation while preserving canonical valid objects.",
+      "baseline": "permissive dictionaries accept valid and invalid objects without typed invariant checks",
+      "treatment": "framework-independent frozen Pydantic contracts with cross-object validation",
+      "suite": "phase-03-strict-contract-conformance",
+      "metrics": [
+        {"metric": "valid_acceptance_rate", "operation": "eq", "threshold": 1},
+        {"metric": "invalid_rejection_rate", "operation": "eq", "threshold": 1},
+        {"metric": "mutable_round_trips", "operation": "eq", "threshold": 0}
+      ],
+      "trace_requirements": ["evaluator", "report", "artifact"],
+      "seeds": [41],
+      "max_requests": 0,
+      "max_cost_usd": 0,
+      "invalidation_conditions": ["missing_trace", "fingerprint_mismatch", "privacy_failure", "incomplete_schedule"],
+      "report_owner": "phase-03"
+    },
+    {
+      "feature_id": "persistence.immutable_repositories",
+      "hypothesis": "Migrated SQLite repositories preserve canonical contracts across restart without partial writes or trust-scope widening.",
+      "baseline": "canonical in-memory serialization has no restart, rollback, scope, or database privacy guarantees",
+      "treatment": "versioned SQLite schema and explicit immutable repositories",
+      "suite": "phase-03-persistence-conformance",
+      "metrics": [
+        {"metric": "restart_fidelity_rate", "operation": "eq", "threshold": 1},
+        {"metric": "partial_write_count", "operation": "eq", "threshold": 0},
+        {"metric": "trust_widening_count", "operation": "eq", "threshold": 0},
+        {"metric": "forbidden_storage_field_count", "operation": "eq", "threshold": 0}
+      ],
+      "trace_requirements": ["evaluator", "report", "artifact"],
+      "seeds": [41],
+      "max_requests": 0,
+      "max_cost_usd": 0,
+      "invalidation_conditions": ["missing_trace", "fingerprint_mismatch", "privacy_failure", "migration_failure", "partial_write"],
+      "report_owner": "phase-03"
+    },
+    {
+      "feature_id": "api.instruction_presets",
+      "hypothesis": "Instruction-only presets preserve exact run snapshots while rejecting execution-routing controls.",
+      "baseline": "direct instruction snapshots have no reusable preset lifecycle",
+      "treatment": "strict preset CRUD with immutable instruction snapshots and search-only tags",
+      "suite": "phase-03-preset-conformance",
+      "metrics": [
+        {"metric": "instruction_equivalence_rate", "operation": "eq", "threshold": 1},
+        {"metric": "snapshot_preservation_rate", "operation": "eq", "threshold": 1},
+        {"metric": "routing_field_rejection_rate", "operation": "eq", "threshold": 1}
+      ],
+      "trace_requirements": ["evaluator", "report", "artifact"],
+      "seeds": [41],
+      "max_requests": 0,
+      "max_cost_usd": 0,
+      "invalidation_conditions": ["missing_trace", "fingerprint_mismatch", "privacy_failure", "snapshot_drift", "api_repository_mismatch"],
+      "report_owner": "phase-03"
+    }
+  ]
+}
