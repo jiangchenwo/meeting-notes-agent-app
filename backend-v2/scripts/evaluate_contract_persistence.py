@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 import tempfile
 
-from notes_agent_v2.evaluation.phase3 import (
+from notes_agent_v2.evaluation.contract_persistence import (
     PHASE3_CASE_COUNTS,
     evaluate_phase3_feature,
     write_phase3_evaluation_bundle,

@@ -266,7 +266,7 @@ def _code_fingerprint() -> str:
         *(root / "src/notes_agent_v2/persistence").glob("*.py"),
         root / "src/notes_agent_v2/api/presets.py",
         root / "src/notes_agent_v2/app.py",
-        root / "src/notes_agent_v2/evaluation/phase3.py",
+        root / "src/notes_agent_v2/evaluation/contract_persistence.py",
         root / "config/evaluation/features.json",
         root / "alembic/env.py",
         root / "alembic/versions/0001_initial.py",

@@ -5,7 +5,7 @@ import subprocess
 import sys
 
 from notes_agent_v2.evaluation.artifacts import verify_bundle
-from notes_agent_v2.evaluation.phase3 import (
+from notes_agent_v2.evaluation.contract_persistence import (
     PHASE3_CASE_COUNTS,
     evaluate_phase3_feature,
     render_phase3_report,
@@ -58,7 +58,7 @@ def test_phase3_features_are_registered_with_offline_budgets() -> None:
 
 
 def test_phase3_evaluation_cli_writes_private_bundle(tmp_path: Path) -> None:
-    script = Path(__file__).resolve().parents[3] / "scripts/evaluate_phase3.py"
+    script = Path(__file__).resolve().parents[3] / "scripts/evaluate_contract_persistence.py"
     output = tmp_path / "strict-contracts"
     completed = subprocess.run(
         [sys.executable, str(script), "--feature", "domain.strict_contracts", "--private-out", str(output)],
