@@ -84,6 +84,7 @@ def test_unknown_tool_and_entity_never_execute() -> None:
     tool_session = session(executions)
     with pytest.raises(ToolAuthorizationError, match="tool"):
         tool_session.execute(call(name="delete"), run_id="run-1", stage="writer", round_number=1)
+    tool_session = session(executions)
     with pytest.raises(ToolAuthorizationError, match="entity"):
         tool_session.execute(
             call({"fact_id": "f2"}), run_id="run-1", stage="writer", round_number=1

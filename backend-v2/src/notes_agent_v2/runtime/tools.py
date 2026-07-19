@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+import json
+from typing import Literal
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -42,6 +44,23 @@ class ToolExecutionResult(BaseModel):
     result_tokens: int = Field(ge=0)
 
 
+class ToolAuditRecord(BaseModel):
+    """Safe accounting metadata; never contains tool arguments or result bodies."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    audit_id: str
+    run_id: str
+    stage: str
+    call_id: str
+    tool_name: str
+    round_number: int = Field(ge=1)
+    status: Literal["passed", "rejected", "failed"]
+    cache_hit: bool
+    result_tokens: int = Field(ge=0)
+    error_code: str | None
+
+
 class ToolSession:
     def __init__(
         self,
@@ -49,12 +68,16 @@ class ToolSession:
         policy: ToolPolicy,
         definitions: dict[str, ToolDefinition],
         count_tokens: Callable[[str], int],
+        audit: Callable[[ToolAuditRecord], None] = lambda _record: None,
     ) -> None:
         self.policy = policy
         self.definitions = definitions
         self.count_tokens = count_tokens
+        self.audit = audit
         self.calls = 0
         self.result_tokens = 0
+        self._cache: dict[str, str] = {}
+        self._audit_sequence = 0
 
     def execute(
         self,
@@ -64,18 +87,98 @@ class ToolSession:
         stage: str,
         round_number: int,
     ) -> ToolExecutionResult:
-        definition = self._authorize(call, run_id=run_id, stage=stage, round_number=round_number)
+        cache_hit = False
         self.calls += 1
-        content = definition.handler(dict(call.arguments))
-        tokens = self.count_tokens(content)
-        if self.result_tokens + tokens > self.policy.max_result_tokens:
-            raise ToolAuthorizationError("tool result token limit exceeded")
-        self.result_tokens += tokens
-        return ToolExecutionResult(
-            call_id=call.call_id,
-            name=call.name,
-            content=content,
-            result_tokens=tokens,
+        try:
+            definition = self._authorize(
+                call, run_id=run_id, stage=stage, round_number=round_number
+            )
+            cache_key = json.dumps(
+                {"name": call.name, "arguments": call.arguments},
+                sort_keys=True,
+                separators=(",", ":"),
+                default=str,
+            )
+            cache_hit = cache_key in self._cache
+            content = (
+                self._cache[cache_key]
+                if cache_hit
+                else definition.handler(dict(call.arguments))
+            )
+            tokens = self.count_tokens(content)
+            if self.result_tokens + tokens > self.policy.max_result_tokens:
+                raise ToolAuthorizationError("tool result token limit exceeded")
+            self.result_tokens += tokens
+            if not cache_hit:
+                self._cache[cache_key] = content
+            result = ToolExecutionResult(
+                call_id=call.call_id,
+                name=call.name,
+                content=content,
+                result_tokens=tokens,
+            )
+            self._record_audit(
+                run_id=run_id,
+                stage=stage,
+                call=call,
+                round_number=round_number,
+                status="passed",
+                cache_hit=cache_hit,
+                result_tokens=tokens,
+                error_code=None,
+            )
+            return result
+        except ToolAuthorizationError as exc:
+            self._record_audit(
+                run_id=run_id,
+                stage=stage,
+                call=call,
+                round_number=max(1, round_number),
+                status="rejected",
+                cache_hit=cache_hit,
+                result_tokens=0,
+                error_code=str(exc),
+            )
+            raise
+        except Exception as exc:
+            self._record_audit(
+                run_id=run_id,
+                stage=stage,
+                call=call,
+                round_number=max(1, round_number),
+                status="failed",
+                cache_hit=cache_hit,
+                result_tokens=0,
+                error_code=type(exc).__name__,
+            )
+            raise
+
+    def _record_audit(
+        self,
+        *,
+        run_id: str,
+        stage: str,
+        call: NormalizedToolCall,
+        round_number: int,
+        status: Literal["passed", "rejected", "failed"],
+        cache_hit: bool,
+        result_tokens: int,
+        error_code: str | None,
+    ) -> None:
+        self._audit_sequence += 1
+        self.audit(
+            ToolAuditRecord(
+                audit_id=f"tool-audit-{self._audit_sequence:06d}",
+                run_id=run_id,
+                stage=stage,
+                call_id=call.call_id,
+                tool_name=call.name,
+                round_number=round_number,
+                status=status,
+                cache_hit=cache_hit,
+                result_tokens=result_tokens,
+                error_code=error_code,
+            )
         )
 
     def _authorize(
@@ -92,7 +195,7 @@ class ToolSession:
             raise ToolAuthorizationError("tool stage scope mismatch")
         if round_number < 1 or round_number > self.policy.max_rounds:
             raise ToolAuthorizationError("tool round limit exceeded")
-        if self.calls >= self.policy.max_calls:
+        if self.calls > self.policy.max_calls:
             raise ToolAuthorizationError("tool call limit exceeded")
         if call.name not in self.policy.allowed_tools or call.name not in self.definitions:
             raise ToolAuthorizationError("tool is not authorized")
