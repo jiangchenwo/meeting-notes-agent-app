@@ -427,6 +427,103 @@
       "max_cost_usd": 0,
       "invalidation_conditions": ["missing_trace", "fingerprint_mismatch", "privacy_failure", "snapshot_drift", "api_repository_mismatch"],
       "report_owner": "phase-03"
+    },
+    {
+      "feature_id": "evidence.token_aware_chunking",
+      "hypothesis": "Utterance-boundary exact-token chunking preserves complete ordered transcript coverage while preventing context overflow.",
+      "baseline": "fixed-token text slicing without utterance-boundary or exact rendered-prompt guarantees",
+      "treatment": "exact-token utterance chunks with four-utterance overlap and immutable plan provenance",
+      "suite": "phase-04-token-aware-chunking",
+      "metrics": [
+        {"metric": "utterance_coverage", "operation": "eq", "threshold": 1},
+        {"metric": "split_loss_or_reordering", "operation": "eq", "threshold": 0},
+        {"metric": "context_overflow_count", "operation": "eq", "threshold": 0},
+        {"metric": "repeat_plan_equivalence", "operation": "eq", "threshold": 1}
+      ],
+      "trace_requirements": ["evaluator", "report", "artifact"],
+      "seeds": [41],
+      "max_requests": 0,
+      "max_cost_usd": 0,
+      "invalidation_conditions": ["missing_trace", "fingerprint_mismatch", "privacy_failure", "coverage_loss", "context_overflow"],
+      "report_owner": "phase-04"
+    },
+    {
+      "feature_id": "evidence.cited_atomic_extraction",
+      "hypothesis": "All-chunk cited atomic extraction improves reference recall without weakening precision, attribution, or exact-evidence validity.",
+      "baseline": "one-shot structured extraction over the bounded transcript comparator",
+      "treatment": "thinking-off native-schema extraction for every evidence chunk with exact citation validation",
+      "suite": "phase-04-cited-atomic-extraction",
+      "metrics": [
+        {"metric": "completion_and_validity", "operation": "eq", "threshold": 1},
+        {"metric": "reference_recall_delta", "operation": "gte", "threshold": 0.05},
+        {"metric": "reference_precision_delta", "operation": "gte", "threshold": -0.01},
+        {"metric": "exact_evidence_citation_precision", "operation": "eq", "threshold": 1}
+      ],
+      "trace_requirements": ["stage", "model", "artifact", "evaluator", "report"],
+      "seeds": [41],
+      "max_requests": 64,
+      "max_cost_usd": 0,
+      "invalidation_conditions": ["missing_trace", "fingerprint_mismatch", "privacy_failure", "incomplete_chunk", "unqualified_runtime", "missing_live_approval"],
+      "report_owner": "phase-04"
+    },
+    {
+      "feature_id": "evidence.source_verification",
+      "hypothesis": "Deterministic plus bounded semantic verification reduces unsupported accepted facts without losing reference recall.",
+      "baseline": "cited extraction accepted without a source-verification stage",
+      "treatment": "deterministic source checks followed by scoped semantic verification only for ambiguity",
+      "suite": "phase-04-source-verification",
+      "metrics": [
+        {"metric": "injected_error_recall", "operation": "eq", "threshold": 1},
+        {"metric": "clean_critical_false_positives", "operation": "eq", "threshold": 0},
+        {"metric": "unsupported_accepted_reduction", "operation": "gte", "threshold": 0.5},
+        {"metric": "evidence_citation_precision", "operation": "eq", "threshold": 1}
+      ],
+      "trace_requirements": ["stage", "model", "artifact", "evaluator", "report"],
+      "seeds": [41],
+      "max_requests": 48,
+      "max_cost_usd": 0,
+      "invalidation_conditions": ["missing_trace", "fingerprint_mismatch", "privacy_failure", "deterministic_override", "unqualified_runtime", "missing_live_approval"],
+      "report_owner": "phase-04"
+    },
+    {
+      "feature_id": "evidence.loss_aware_consolidation",
+      "hypothesis": "Exact-then-semantic consolidation removes true duplicates while preserving evidence, corrections, conflicts, and unique facts.",
+      "baseline": "verified candidates retained independently without consolidation",
+      "treatment": "immutable deterministic grouping with guarded semantic proposals and explicit relationship graphs",
+      "suite": "phase-04-loss-aware-consolidation",
+      "metrics": [
+        {"metric": "unique_fact_recall", "operation": "eq", "threshold": 1},
+        {"metric": "correction_and_conflict_recall", "operation": "eq", "threshold": 1},
+        {"metric": "evidence_preservation", "operation": "eq", "threshold": 1},
+        {"metric": "false_semantic_merges", "operation": "eq", "threshold": 0},
+        {"metric": "duplicate_reduction", "operation": "gte", "threshold": 0.8}
+      ],
+      "trace_requirements": ["stage", "model", "artifact", "evaluator", "report"],
+      "seeds": [41],
+      "max_requests": 24,
+      "max_cost_usd": 0,
+      "invalidation_conditions": ["missing_trace", "fingerprint_mismatch", "privacy_failure", "evidence_loss", "false_merge", "unqualified_runtime", "missing_live_approval"],
+      "report_owner": "phase-04"
+    },
+    {
+      "feature_id": "evidence.scoped_tools",
+      "hypothesis": "Closed read-only evidence tools preserve direct-reader results while rejecting every scope, mutation, and budget violation.",
+      "baseline": "test-only direct repository reads without per-call authorization",
+      "treatment": "run-stage-entity scoped closed tool registry with safe durable audit accounting",
+      "suite": "phase-04-scoped-evidence-tools",
+      "metrics": [
+        {"metric": "allowed_result_equivalence", "operation": "eq", "threshold": 1},
+        {"metric": "unauthorized_rejection", "operation": "eq", "threshold": 1},
+        {"metric": "limit_enforcement", "operation": "eq", "threshold": 1},
+        {"metric": "budget_accounting_equality", "operation": "eq", "threshold": 1},
+        {"metric": "sensitive_trace_fields", "operation": "eq", "threshold": 0}
+      ],
+      "trace_requirements": ["tool", "evaluator", "report", "artifact"],
+      "seeds": [41],
+      "max_requests": 0,
+      "max_cost_usd": 0,
+      "invalidation_conditions": ["missing_trace", "fingerprint_mismatch", "privacy_failure", "scope_widening", "accounting_mismatch"],
+      "report_owner": "phase-04"
     }
   ]
 }

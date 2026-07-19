@@ -33,9 +33,10 @@ def test_feature_spec_requires_falsifiable_comparison_and_budget(tmp_path: Path)
 def test_checked_in_feature_registry_is_valid_and_complete() -> None:
     path = Path(__file__).resolve().parents[3] / "config/evaluation/features.json"
     specs = load_feature_specs(path)
-    assert len(specs) == 15
+    assert len(specs) == 20
     assert sum(spec.report_owner == "phase-02" for spec in specs.values()) == 12
     assert sum(spec.report_owner == "phase-03" for spec in specs.values()) == 3
+    assert sum(spec.report_owner == "phase-04" for spec in specs.values()) == 5
 
 
 def test_trace_pairs_spans_and_rejects_private_fields(tmp_path: Path) -> None:
