@@ -461,7 +461,7 @@
       ],
       "trace_requirements": ["stage", "model", "artifact", "evaluator", "report"],
       "seeds": [41],
-      "max_requests": 64,
+      "max_requests": 102,
       "max_cost_usd": 0,
       "invalidation_conditions": ["missing_trace", "fingerprint_mismatch", "privacy_failure", "incomplete_chunk", "unqualified_runtime", "missing_live_approval"],
       "report_owner": "phase-04"
@@ -524,6 +524,90 @@
       "max_cost_usd": 0,
       "invalidation_conditions": ["missing_trace", "fingerprint_mismatch", "privacy_failure", "scope_widening", "accounting_mismatch"],
       "report_owner": "phase-04"
+    },
+    {
+      "feature_id": "planning.generation_brief",
+      "hypothesis": "Reasoned instruction interpretation followed by isolated structured finalization improves audience and constraint fit without allowing transcript data to select execution controls.",
+      "baseline": "deterministic defaults with bounded keyword extraction",
+      "treatment": "reasoned instruction analysis followed by thinking-off structured generation-brief finalization",
+      "suite": "planning-generation-brief",
+      "metrics": [
+        {"metric": "schema_validity", "operation": "eq", "threshold": 1},
+        {"metric": "forbidden_execution_control_fields", "operation": "eq", "threshold": 0},
+        {"metric": "instruction_attribute_micro_f1", "operation": "gte", "threshold": 0.95},
+        {"metric": "exact_default_behavior", "operation": "eq", "threshold": 1},
+        {"metric": "prompt_injection_policy_violations", "operation": "eq", "threshold": 0},
+        {"metric": "transcript_instruction_mutations", "operation": "eq", "threshold": 0}
+      ],
+      "trace_requirements": ["stage", "model", "evaluator", "report", "artifact"],
+      "seeds": [41],
+      "max_requests": 132,
+      "max_cost_usd": 0.05,
+      "invalidation_conditions": ["missing_trace", "fingerprint_mismatch", "privacy_failure", "instruction_mutation", "execution_control_leak", "unqualified_runtime", "missing_live_approval"],
+      "report_owner": "planning"
+    },
+    {
+      "feature_id": "planning.salience_selection",
+      "hypothesis": "Instruction-aware normalized salience improves relevant-fact ordering while preserving verified decisions, actions, corrections, and uncertainty semantics.",
+      "baseline": "source-order fact selection with a fixed top-k cutoff",
+      "treatment": "bounded relevance classification combined with deterministic normalized evidence weights and mandatory-fact policy",
+      "suite": "salience-selection",
+      "metrics": [
+        {"metric": "mandatory_verified_selection", "operation": "eq", "threshold": 1},
+        {"metric": "uncertain_mandatory_count", "operation": "eq", "threshold": 0},
+        {"metric": "deterministic_ordering", "operation": "eq", "threshold": 1},
+        {"metric": "relevant_recall_at_k_delta", "operation": "gte", "threshold": 0},
+        {"metric": "ndcg_at_10_delta", "operation": "gte", "threshold": 0.05},
+        {"metric": "status_owner_due_fidelity_regression", "operation": "eq", "threshold": 0}
+      ],
+      "trace_requirements": ["stage", "model", "evaluator", "report", "artifact"],
+      "seeds": [41],
+      "max_requests": 88,
+      "max_cost_usd": 0.05,
+      "invalidation_conditions": ["missing_trace", "fingerprint_mismatch", "privacy_failure", "mandatory_fact_loss", "truth_mutation", "unqualified_runtime", "missing_live_approval"],
+      "report_owner": "planning"
+    },
+    {
+      "feature_id": "planning.closed_capability_plan",
+      "hypothesis": "A closed, validated capability structure improves requested-content coverage without allowing model output to widen execution authority.",
+      "baseline": "fixed overview and narrative blocks in source order",
+      "treatment": "reasoned capability selection followed by isolated structured finalization, application validation, and deterministic mandatory-fact repair",
+      "suite": "closed-capability-selection",
+      "metrics": [
+        {"metric": "schema_validity", "operation": "eq", "threshold": 1},
+        {"metric": "requested_capability_recall", "operation": "gte", "threshold": 0.95},
+        {"metric": "mandatory_fact_assignment", "operation": "eq", "threshold": 1},
+        {"metric": "unknown_reference_count", "operation": "eq", "threshold": 0},
+        {"metric": "execution_authority_widening", "operation": "eq", "threshold": 0},
+        {"metric": "deterministic_repair", "operation": "eq", "threshold": 1}
+      ],
+      "trace_requirements": ["stage", "model", "evaluator", "report", "artifact"],
+      "seeds": [41],
+      "max_requests": 176,
+      "max_cost_usd": 0.05,
+      "invalidation_conditions": ["missing_trace", "fingerprint_mismatch", "privacy_failure", "unknown_reference", "authority_widening", "mandatory_fact_loss", "unqualified_runtime", "missing_live_approval"],
+      "report_owner": "planning"
+    },
+    {
+      "feature_id": "planning.bounded_dispatcher",
+      "hypothesis": "A serial application-owned dispatch boundary prevents role, profile, tool, budget, and concurrency widening while preserving valid gateway behavior.",
+      "baseline": "direct role calls to the runtime gateway",
+      "treatment": "closed role/profile/tool policy with fresh messages, serial dispatch, typed failure classification, and safe accounting traces",
+      "suite": "bounded-role-dispatch",
+      "metrics": [
+        {"metric": "authorized_call_equivalence", "operation": "eq", "threshold": 1},
+        {"metric": "unauthorized_request_rejection", "operation": "eq", "threshold": 1},
+        {"metric": "parallel_dispatch_count", "operation": "eq", "threshold": 0},
+        {"metric": "accounting_equality", "operation": "eq", "threshold": 1},
+        {"metric": "sensitive_trace_fields", "operation": "eq", "threshold": 0},
+        {"metric": "unclassified_failure_count", "operation": "eq", "threshold": 0}
+      ],
+      "trace_requirements": ["stage", "model", "tool", "evaluator", "report", "artifact"],
+      "seeds": [41],
+      "max_requests": 100,
+      "max_cost_usd": 0,
+      "invalidation_conditions": ["missing_trace", "fingerprint_mismatch", "privacy_failure", "policy_widening", "parallel_dispatch", "accounting_mismatch"],
+      "report_owner": "planning"
     }
   ]
 }
