@@ -94,7 +94,7 @@
       "top_k": 40,
       "max_tokens": 8192,
       "parse_retries": 1,
-      "max_tool_rounds": 1,
+      "max_tool_rounds": 2,
       "max_tool_calls": 3,
       "max_tool_result_tokens": 3072,
       "status": "candidate"
