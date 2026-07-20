@@ -608,6 +608,107 @@
       "max_cost_usd": 0,
       "invalidation_conditions": ["missing_trace", "fingerprint_mismatch", "privacy_failure", "policy_widening", "parallel_dispatch", "accounting_mismatch"],
       "report_owner": "planning"
+    },
+    {
+      "feature_id": "generation.fact_covered_outline",
+      "hypothesis": "A fact-covered outline preserves every mandatory verified fact and valid context assignment before prose generation.",
+      "baseline": "write directly from the capability plan without a claim-level outline",
+      "treatment": "ordered claim purposes bound to assigned verified fact and approved context identifiers",
+      "suite": "fact-covered-outline",
+      "metrics": [
+        {"metric": "mandatory_fact_coverage", "operation": "eq", "threshold": 1},
+        {"metric": "unsupported_reference_count", "operation": "eq", "threshold": 0},
+        {"metric": "valid_assignment_rate", "operation": "eq", "threshold": 1},
+        {"metric": "correction_ordering", "operation": "eq", "threshold": 1},
+        {"metric": "trace_completeness", "operation": "eq", "threshold": 1}
+      ],
+      "trace_requirements": ["stage", "model", "tool", "evaluator", "report", "artifact"],
+      "seeds": [41],
+      "max_requests": 24,
+      "max_cost_usd": 0.05,
+      "invalidation_conditions": ["missing_trace", "fingerprint_mismatch", "privacy_failure", "mandatory_fact_loss", "unknown_reference", "invalid_order"],
+      "report_owner": "generation-quality"
+    },
+    {
+      "feature_id": "generation.evidence_linked_writing",
+      "hypothesis": "Isolated block writers improve reference recall and factual alignment while keeping every accepted claim linked to verified evidence.",
+      "baseline": "one-shot notes generation without claim-level evidence enforcement",
+      "treatment": "isolated typed and narrative writers with citation, entity, assignment, and assembly validation",
+      "suite": "evidence-linked-writing",
+      "metrics": [
+        {"metric": "completion_and_validity", "operation": "eq", "threshold": 1},
+        {"metric": "accepted_evidence_link_rate", "operation": "eq", "threshold": 1},
+        {"metric": "unsupported_accepted_claims", "operation": "eq", "threshold": 0},
+        {"metric": "reference_recall_delta", "operation": "gte", "threshold": 0.05},
+        {"metric": "reference_precision_delta", "operation": "gte", "threshold": -0.01},
+        {"metric": "qag_alignment_delta", "operation": "gte", "threshold": 0.05}
+      ],
+      "trace_requirements": ["stage", "model", "tool", "evaluator", "qag", "judge", "report", "artifact"],
+      "seeds": [41],
+      "max_requests": 128,
+      "max_cost_usd": 0.10,
+      "invalidation_conditions": ["missing_trace", "fingerprint_mismatch", "privacy_failure", "uncited_claim", "unsupported_claim", "incomplete_pair", "unqualified_runtime", "unqualified_judge"],
+      "report_owner": "generation-quality"
+    },
+    {
+      "feature_id": "quality.specialist_critics",
+      "hypothesis": "Independent specialist critics increase concrete semantic error recall without hiding deterministic issues or creating clean critical false positives.",
+      "baseline": "deterministic citation, coverage, entity, and structured validators only",
+      "treatment": "deterministic validators followed by isolated claim, coverage, structured, and audience issue detectors",
+      "suite": "specialist-critic-calibration",
+      "metrics": [
+        {"metric": "injected_critical_recall", "operation": "eq", "threshold": 1},
+        {"metric": "clean_critical_false_positives", "operation": "eq", "threshold": 0},
+        {"metric": "issue_target_validity", "operation": "eq", "threshold": 1},
+        {"metric": "critic_failure_conversion", "operation": "eq", "threshold": 1},
+        {"metric": "semantic_recall_delta", "operation": "gte", "threshold": 0.10}
+      ],
+      "trace_requirements": ["stage", "model", "tool", "evaluator", "report", "artifact"],
+      "seeds": [41],
+      "max_requests": 192,
+      "max_cost_usd": 0.10,
+      "invalidation_conditions": ["missing_trace", "fingerprint_mismatch", "privacy_failure", "invalid_issue", "deterministic_issue_removed", "critic_failure_omitted", "unqualified_runtime"],
+      "report_owner": "generation-quality"
+    },
+    {
+      "feature_id": "quality.deterministic_acceptance",
+      "hypothesis": "Ordered deterministic gates exactly reproduce the safe disposition and draft ranking oracle without unsafe acceptance.",
+      "baseline": "authored expected dispositions and rankings at every acceptance boundary",
+      "treatment": "critic-failure, critical, coverage, evidence, warning, and acceptance gates in fixed order",
+      "suite": "deterministic-acceptance",
+      "metrics": [
+        {"metric": "disposition_ranking_agreement", "operation": "eq", "threshold": 1},
+        {"metric": "unsafe_acceptance_count", "operation": "eq", "threshold": 0},
+        {"metric": "critic_failure_review_routing", "operation": "eq", "threshold": 1},
+        {"metric": "deterministic_repeatability", "operation": "eq", "threshold": 1}
+      ],
+      "trace_requirements": ["stage", "evaluator", "report", "artifact"],
+      "seeds": [41],
+      "max_requests": 0,
+      "max_cost_usd": 0,
+      "invalidation_conditions": ["missing_trace", "fingerprint_mismatch", "privacy_failure", "unsafe_acceptance", "nondeterministic_ranking"],
+      "report_owner": "generation-quality"
+    },
+    {
+      "feature_id": "quality.targeted_revision",
+      "hypothesis": "At most two issue-scoped revisions resolve target errors while retaining mandatory evidence and leaving unaffected blocks byte-identical.",
+      "baseline": "the valid parent draft before revision",
+      "treatment": "immutable issue-scoped block replacement with parent linkage and deterministic revalidation",
+      "suite": "targeted-revision",
+      "metrics": [
+        {"metric": "targeted_issue_resolution", "operation": "gte", "threshold": 0.80},
+        {"metric": "new_critical_issues", "operation": "eq", "threshold": 0},
+        {"metric": "unchanged_block_integrity", "operation": "eq", "threshold": 1},
+        {"metric": "mandatory_fact_retention", "operation": "eq", "threshold": 1},
+        {"metric": "evidence_link_rate", "operation": "eq", "threshold": 1},
+        {"metric": "qag_parent_regression", "operation": "gte", "threshold": 0}
+      ],
+      "trace_requirements": ["stage", "model", "tool", "evaluator", "qag", "report", "artifact"],
+      "seeds": [41],
+      "max_requests": 48,
+      "max_cost_usd": 0.05,
+      "invalidation_conditions": ["missing_trace", "fingerprint_mismatch", "privacy_failure", "scope_widening", "mandatory_fact_loss", "parent_mutation", "revision_limit_exceeded", "unqualified_runtime"],
+      "report_owner": "generation-quality"
     }
   ]
 }
