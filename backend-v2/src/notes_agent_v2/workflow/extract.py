@@ -78,6 +78,62 @@ def _candidate_identifier(
     return f"fc{int(digest[:12], 16) % 1_000_000:06d}"
 
 
+def _canonicalize_candidate(
+    payload: CandidatePayload,
+    *,
+    chunk: EvidenceChunk,
+    utterance_by_id: dict[str, Utterance],
+) -> CandidatePayload:
+    source_ids = tuple(
+        identifier
+        for span in payload.evidence
+        for identifier in span.utterance_ids
+    )
+    if any(identifier not in utterance_by_id for identifier in source_ids):
+        raise _CandidateValidationError("unknown_utterance")
+    if any(identifier not in chunk.utterance_ids for identifier in source_ids):
+        raise _CandidateValidationError("utterance_outside_chunk")
+
+    evidence = tuple(
+        EvidenceSpan(
+            utterance_ids=span.utterance_ids,
+            quote="\n".join(
+                utterance_by_id[identifier].text
+                for identifier in span.utterance_ids
+            ),
+        )
+        for span in payload.evidence
+    )
+    source_utterances = [utterance_by_id[identifier] for identifier in source_ids]
+    source_text = "\n".join(item.quote for item in evidence).casefold()
+    speaker_aliases = {
+        alias.casefold(): item.speaker_id
+        for item in source_utterances
+        for alias in (item.speaker_id, item.speaker_name)
+        if alias is not None and item.speaker_id is not None
+    }
+    speaker_ids = tuple(
+        dict.fromkeys(
+            speaker_aliases.get(speaker.casefold(), speaker)
+            for speaker in payload.speaker_ids
+        )
+    )
+    owner = payload.owner if payload.kind == "action" else None
+    due_text = payload.due_text if payload.kind == "action" else None
+    if owner is not None and owner.casefold() not in source_text:
+        owner = None
+    if due_text is not None and due_text.casefold() not in source_text:
+        due_text = None
+    return payload.model_copy(
+        update={
+            "speaker_ids": speaker_ids,
+            "owner": owner,
+            "due_text": due_text,
+            "evidence": evidence,
+        }
+    )
+
+
 def _validate_candidate(
     payload: CandidatePayload,
     *,
@@ -154,6 +210,7 @@ def extract_cited_facts(
     utterances: Sequence[Utterance],
     gateway: ExtractionGateway,
     budget: RunBudget,
+    profile_name: str = "structured_off",
     persist_artifact: Callable[[ChunkExtractionResult], None] = lambda _item: None,
 ) -> ExtractionRunResult:
     """Extract every chunk independently and fail the run closed on any loss."""
@@ -168,7 +225,7 @@ def extract_cited_facts(
             run_id=run_id,
             stage="extract",
             role="atomic_fact_extractor",
-            profile_name="structured_off",
+            profile_name=profile_name,
             messages=build_extraction_messages(
                 instruction=instruction, utterances=chunk_utterances
             ),
@@ -179,6 +236,9 @@ def extract_cited_facts(
             parsed = _parse_payload(_extract_content(gateway_result))
             chunk_candidates: list[ExtractedFactCandidate] = []
             for local_index, payload in enumerate(parsed.candidates):
+                payload = _canonicalize_candidate(
+                    payload, chunk=chunk, utterance_by_id=utterance_by_id
+                )
                 _validate_candidate(
                     payload, chunk=chunk, utterance_by_id=utterance_by_id
                 )

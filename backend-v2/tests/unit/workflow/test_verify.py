@@ -137,9 +137,88 @@ def test_ambiguous_paraphrase_uses_only_bounded_neighbor_window() -> None:
     payload = json.loads(gateway.requests[0].messages[-1]["content"])
     assert len(payload["source_window"]) <= 8
     assert gateway.requests[0].profile_name == "structured_off"
+    system = gateway.requests[0].messages[0]["content"]
+    assert "polarity" in system
+    assert "adds or removes negation" in system
 
 
-def test_semantic_disagreement_becomes_uncertain_and_preserves_both_findings() -> None:
+def test_contracted_negation_matches_explicit_negation_semantically() -> None:
+    utterances = normalize_transcript(
+        "We don't want to use teletext anymore.",
+        None,
+    )
+    candidate = _candidate(
+        "Teletext will not be used.",
+        quote="We don't want to use teletext anymore.",
+        ids=("u000001",),
+        speakers=(),
+    )
+    gateway = SemanticGateway(
+        {"status": "supported", "evidence_ids": ["u000001"]}
+    )
+
+    decision = verify_candidates(
+        run_id="r1",
+        candidates=(candidate,),
+        utterances=utterances,
+        gateway=gateway,
+        budget=RunBudget(),
+    )[0]
+
+    assert decision.status == "supported"
+    assert decision.deterministic_findings == ("deterministic_ambiguous",)
+
+
+def test_spelled_number_matches_equivalent_digits_semantically() -> None:
+    utterances = normalize_transcript(
+        "The younger people were defined under forty.",
+        None,
+    )
+    candidate = _candidate(
+        "The target group will be people below 40.",
+        quote="The younger people were defined under forty.",
+        ids=("u000001",),
+        speakers=(),
+    )
+    gateway = SemanticGateway(
+        {"status": "supported", "evidence_ids": ["u000001"]}
+    )
+
+    decision = verify_candidates(
+        run_id="r1",
+        candidates=(candidate,),
+        utterances=utterances,
+        gateway=gateway,
+        budget=RunBudget(),
+    )[0]
+
+    assert decision.status == "supported"
+    assert "number_mismatch" not in decision.deterministic_findings
+
+
+def test_semantic_verification_profile_can_be_bounded_by_the_caller() -> None:
+    candidate = _candidate(
+        "The delivery schedule is materially threatened.",
+        quote="The rollout creates a material delivery risk.",
+        ids=("u000005",),
+    )
+    gateway = SemanticGateway(
+        {"status": "supported", "evidence_ids": ["u000005"]}
+    )
+
+    verify_candidates(
+        run_id="r1",
+        candidates=(candidate,),
+        utterances=_utterances(),
+        gateway=gateway,
+        budget=RunBudget(),
+        profile_name="evaluation_structured_off",
+    )
+
+    assert gateway.requests[0].profile_name == "evaluation_structured_off"
+
+
+def test_semantic_contradiction_is_preserved_with_bounded_evidence() -> None:
     candidate = _candidate(
         "The delivery schedule is materially threatened.",
         quote="The rollout creates a material delivery risk.",
@@ -155,9 +234,39 @@ def test_semantic_disagreement_becomes_uncertain_and_preserves_both_findings() -
         gateway=gateway,
         budget=RunBudget(),
     )[0]
-    assert decision.status == "uncertain"
+    assert decision.status == "contradicted"
     assert "deterministic_ambiguous" in decision.deterministic_findings
     assert decision.semantic_finding == "contradicted"
+
+
+def test_semantic_window_contains_noncontiguous_cited_utterances() -> None:
+    utterances = normalize_transcript(
+        "unused",
+        [{"text": f"Turn {index}."} for index in range(1, 21)],
+    )
+    candidate = _candidate(
+        "The first and last points are related.",
+        quote="Turn 2.\nTurn 19.",
+        ids=("u000002", "u000019"),
+        speakers=(),
+    )
+    gateway = SemanticGateway(
+        {"status": "supported", "evidence_ids": ["u000002", "u000019"]}
+    )
+
+    decision = verify_candidates(
+        run_id="r1",
+        candidates=(candidate,),
+        utterances=utterances,
+        gateway=gateway,
+        budget=RunBudget(),
+    )[0]
+
+    payload = json.loads(gateway.requests[0].messages[-1]["content"])
+    window_ids = {item["id"] for item in payload["source_window"]}
+    assert {"u000002", "u000019"}.issubset(window_ids)
+    assert len(window_ids) <= 8
+    assert decision.status == "supported"
 
 
 def test_semantic_verifier_cannot_widen_evidence_scope() -> None:

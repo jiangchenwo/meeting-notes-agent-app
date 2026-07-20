@@ -51,10 +51,59 @@ _DATE = re.compile(
     r"dec(?:ember)?)\s+\d{1,2}\b",
     re.IGNORECASE,
 )
+_NUMBER_WORDS = {
+    "zero": 0,
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+    "eleven": 11,
+    "twelve": 12,
+    "thirteen": 13,
+    "fourteen": 14,
+    "fifteen": 15,
+    "sixteen": 16,
+    "seventeen": 17,
+    "eighteen": 18,
+    "nineteen": 19,
+    "twenty": 20,
+    "thirty": 30,
+    "forty": 40,
+    "fifty": 50,
+    "sixty": 60,
+    "seventy": 70,
+    "eighty": 80,
+    "ninety": 90,
+}
 
 
 def _entities(pattern: re.Pattern[str], text: str) -> set[str]:
     return {item.casefold().rstrip(string.punctuation) for item in pattern.findall(text)}
+
+
+def _number_entities(text: str) -> set[str]:
+    entities = _entities(_NUMBER, text)
+    tokens = _normalized_statement(text).split()
+    index = 0
+    while index < len(tokens):
+        value = _NUMBER_WORDS.get(tokens[index])
+        if value is None:
+            index += 1
+            continue
+        if value >= 20 and index + 1 < len(tokens):
+            unit = _NUMBER_WORDS.get(tokens[index + 1])
+            if unit is not None and 0 < unit < 10:
+                value += unit
+                index += 1
+        entities.add(str(value))
+        index += 1
+    return entities
 
 
 def _normalized_statement(text: str) -> str:
@@ -105,8 +154,8 @@ def _deterministic_findings(
     source_dates = _entities(_DATE, source)
     if not candidate_dates.issubset(source_dates):
         findings.append("date_mismatch")
-    candidate_numbers = _entities(_NUMBER, candidate.text)
-    source_numbers = _entities(_NUMBER, source)
+    candidate_numbers = _number_entities(candidate.text)
+    source_numbers = _number_entities(source)
     if not candidate_numbers.issubset(source_numbers):
         findings.append("number_mismatch")
     if not _entities(_EMAIL, candidate.text).issubset(_entities(_EMAIL, source)):
@@ -116,19 +165,6 @@ def _deterministic_findings(
 
     normalized_source = _normalized_statement(source)
     normalized_candidate = _normalized_statement(candidate.text)
-    negative_source = any(
-        marker in f" {normalized_source} " for marker in (" not ", " no ", " never ")
-    )
-    negative_candidate = any(
-        marker in f" {normalized_candidate} "
-        for marker in (" not ", " no ", " never ")
-    )
-    if negative_source != negative_candidate and candidate.status in {
-        "approved",
-        "completed",
-        "asserted",
-    }:
-        findings.append("status_or_negation_mismatch")
     status_markers = {
         "approved": ("approved", "agreed", "decided", "accepted"),
         "rejected": ("rejected", "declined"),
@@ -174,13 +210,22 @@ def _window(
     evidence_ids: tuple[str, ...], utterances: Sequence[Utterance]
 ) -> tuple[Utterance, ...]:
     order = {item.id: index for index, item in enumerate(utterances)}
-    positions = [order[item] for item in evidence_ids if item in order]
+    positions = list(dict.fromkeys(order[item] for item in evidence_ids if item in order))
     if not positions:
         return ()
-    start = max(0, min(positions) - 3)
-    end = min(len(utterances), start + 8)
-    start = max(0, end - 8)
-    return tuple(utterances[start:end])
+    selected = set(positions[:8])
+    distance = 1
+    while len(selected) < 8 and distance < len(utterances):
+        for position in positions:
+            for neighbor in (position - distance, position + distance):
+                if 0 <= neighbor < len(utterances):
+                    selected.add(neighbor)
+                    if len(selected) == 8:
+                        break
+            if len(selected) == 8:
+                break
+        distance += 1
+    return tuple(utterances[index] for index in sorted(selected))
 
 
 def _parse_semantic(value: str) -> _SemanticPayload:
@@ -209,6 +254,7 @@ def verify_candidates(
     utterances: Sequence[Utterance],
     gateway: VerificationGateway | None,
     budget: RunBudget,
+    profile_name: str = "structured_off",
 ) -> tuple[VerificationDecision, ...]:
     """Verify deterministic invariants, then resolve only semantic ambiguity."""
 
@@ -260,11 +306,17 @@ def verify_candidates(
             run_id=run_id,
             stage="verify",
             role="bounded_fact_verifier",
-            profile_name="structured_off",
+            profile_name=profile_name,
             messages=(
                 {
                     "role": "system",
-                    "content": "Classify support using only the bounded transcript window.",
+                    "content": (
+                        "Classify the candidate's complete claim using only the bounded "
+                        "transcript window. Bind polarity exactly: classify contradicted "
+                        "when the candidate adds or removes negation, reverses whether an "
+                        "action or decision happened, or states the opposite of the source. "
+                        "Do not ignore words such as not, never, no, does not, or will not."
+                    ),
                 },
                 {
                     "role": "user",
@@ -287,13 +339,10 @@ def verify_candidates(
             semantic = _parse_semantic(_result_content(result))
             if any(item not in allowed_ids for item in semantic.evidence_ids):
                 raise PermissionError("semantic_scope_violation")
-            status: Literal["supported", "uncertain"] = (
-                "supported" if semantic.status == "supported" else "uncertain"
-            )
             decisions.append(
                 VerificationDecision(
                     candidate_id=candidate.id,
-                    status=status,
+                    status=semantic.status,
                     evidence_ids=semantic.evidence_ids or evidence_ids,
                     deterministic_findings=ambiguous,
                     semantic_finding=semantic.status,

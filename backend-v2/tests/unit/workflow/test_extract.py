@@ -111,6 +111,10 @@ def test_extracts_all_atomic_fact_kinds_with_exact_citations_and_stable_ids() ->
     assert gateway.requests[0].profile_name == "structured_off"
     assert gateway.requests[0].tools == ()
     assert "Focus on delivery commitments." in gateway.requests[0].messages[-1]["content"]
+    system = gateway.requests[0].messages[0]["content"]
+    assert "verbatim" in system
+    assert "non-null speaker_id" in system
+    assert "owner and due_text" in system
 
 
 def test_no_fact_chunk_is_completed_without_candidates() -> None:
@@ -127,14 +131,28 @@ def test_no_fact_chunk_is_completed_without_candidates() -> None:
     assert result.candidates == ()
 
 
+def test_extraction_profile_can_be_bounded_by_the_caller() -> None:
+    utterances = normalize_transcript("Known text.", None)
+    gateway = FakeGateway([json.dumps({"candidates": []})])
+
+    extract_cited_facts(
+        run_id="r1",
+        instruction="Summarize.",
+        chunks=(_chunk("u000001"),),
+        utterances=utterances,
+        gateway=gateway,
+        budget=RunBudget(),
+        profile_name="evaluation_structured_off",
+    )
+
+    assert gateway.requests[0].profile_name == "evaluation_structured_off"
+
+
 @pytest.mark.parametrize(
     "candidate, error",
     [
-        (_candidate("x", "fact", "asserted", "invented", utterance_ids=["u000001"]), "quote"),
         (_candidate("x", "fact", "asserted", "Known text.", utterance_ids=["u999999"]), "unknown_utterance"),
         (_candidate("x", "fact", "asserted", "Known text.", utterance_ids=["u000001"], speaker_ids=["missing"]), "speaker"),
-        (_candidate("x", "action", "asserted", "Known text.", utterance_ids=["u000001"], owner="Alice"), "owner"),
-        (_candidate("x", "action", "asserted", "Known text.", utterance_ids=["u000001"], due_text="Friday"), "due"),
         (_candidate("x", "proposal", "approved", "I propose option A.", utterance_ids=["u000002"], speaker_ids=["s2"]), "proposal"),
     ],
 )
@@ -157,6 +175,91 @@ def test_rejects_unfounded_candidate_fields(candidate: dict[str, object], error:
     assert result.complete is False
     assert error in (result.chunks[0].error_code or "")
     assert result.candidates == ()
+
+
+def test_canonicalizes_model_quote_to_exact_cited_source_span() -> None:
+    utterances = normalize_transcript(
+        "unused",
+        [
+            {"text": "Ship the API", "speaker_id": "s1"},
+            {"text": "by Friday.", "speaker_id": "s1"},
+        ],
+    )
+    candidate = _candidate(
+        "Ship the API by Friday.",
+        "action",
+        "asserted",
+        "The API should ship Friday.",
+        utterance_ids=["u000001", "u000002"],
+    )
+
+    result = extract_cited_facts(
+        run_id="r1",
+        instruction="Summarize.",
+        chunks=(_chunk("u000001", "u000002"),),
+        utterances=utterances,
+        gateway=FakeGateway([json.dumps({"candidates": [candidate]})]),
+        budget=RunBudget(),
+    )
+
+    assert result.complete is True
+    assert result.candidates[0].evidence[0].quote == "Ship the API\nby Friday."
+
+
+def test_drops_optional_owner_and_due_when_cited_source_does_not_state_them() -> None:
+    utterances = normalize_transcript(
+        "The migration must happen.",
+        None,
+    )
+    candidate = _candidate(
+        "Migrate the service.",
+        "action",
+        "asserted",
+        "The migration must happen.",
+        utterance_ids=["u000001"],
+        owner="Alice",
+        due_text="Friday",
+    )
+
+    result = extract_cited_facts(
+        run_id="r1",
+        instruction="Summarize.",
+        chunks=(_chunk("u000001"),),
+        utterances=utterances,
+        gateway=FakeGateway([json.dumps({"candidates": [candidate]})]),
+        budget=RunBudget(),
+    )
+
+    assert result.complete is True
+    assert result.candidates[0].owner is None
+    assert result.candidates[0].due_text is None
+
+
+def test_normalizes_cited_speaker_display_name_to_source_id() -> None:
+    utterances = normalize_transcript(
+        "unused",
+        [{"text": "The launch is approved.", "speaker_id": "s1", "speaker_name": "Alice"}],
+    )
+    candidate = _candidate(
+        "The launch is approved.",
+        "decision",
+        "approved",
+        "The launch is approved.",
+        utterance_ids=["u000001"],
+        speaker_ids=["Alice"],
+    )
+
+    result = extract_cited_facts(
+        run_id="r1",
+        instruction="Summarize.",
+        chunks=(_chunk("u000001"),),
+        utterances=utterances,
+        gateway=FakeGateway([json.dumps({"candidates": [candidate]})]),
+        budget=RunBudget(),
+    )
+
+    assert result.complete is True
+    assert result.candidates[0].speaker_ids == ("s1",)
 
 
 def test_parser_or_timeout_failure_is_persisted_per_chunk_and_run_is_incomplete() -> None:
