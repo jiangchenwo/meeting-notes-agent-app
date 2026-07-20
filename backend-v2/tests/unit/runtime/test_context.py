@@ -11,8 +11,10 @@ from notes_agent_v2.runtime.context import (
     ContextEnvelope,
     ContextLedger,
     LMStudioPromptTokenizer,
+    LMStudioSDKPromptTokenizer,
     TokenEstimate,
     TokenizerModelMismatch,
+    get_loaded_lm_studio_model,
     prohibit_estimate_readiness_certification,
 )
 
@@ -32,6 +34,21 @@ class ExactTokenizer:
 
     def count_tokens(self, rendered_prompt: str) -> int:
         return len(rendered_prompt.split())
+
+
+def test_uses_currently_loaded_lm_studio_model_without_selecting_or_loading() -> None:
+    loaded = object()
+
+    class Namespace:
+        def model(self, *args, **kwargs):
+            assert args == ()
+            assert kwargs == {}
+            return loaded
+
+    class Client:
+        llm = Namespace()
+
+    assert get_loaded_lm_studio_model(Client()) is loaded
 
 
 def test_default_context_envelope_is_exact() -> None:
@@ -144,4 +161,47 @@ def test_lm_studio_tokenizer_binds_exact_model_and_instance() -> None:
     with pytest.raises(TokenizerModelMismatch):
         LMStudioPromptTokenizer.from_client(
             Client(), model_key=Model.model_key, instance_id="other"
+        )
+
+
+def test_sdk_tokenizer_binds_loaded_model_and_renders_tools() -> None:
+    class Info:
+        model_key = "model"
+        context_length = 40960
+
+    class Model:
+        def get_info(self):
+            return Info()
+
+        def apply_prompt_template(self, history, opts):
+            assert history["messages"][0]["content"] == "hello"
+            assert opts["toolDefinitions"][0]["function"]["name"] == "lookup"
+            return "rendered"
+
+        def tokenize(self, text):
+            assert text == "rendered"
+            return [1, 2, 3]
+
+    tokenizer = LMStudioSDKPromptTokenizer(
+        Model(), model_key="model", instance_id="instance", loaded_context=40960
+    )
+    rendered = tokenizer.render_chat(
+        [{"role": "user", "content": "hello"}],
+        tools=[{"type": "function", "function": {"name": "lookup"}}],
+    )
+    assert tokenizer.count_tokens(rendered) == 3
+
+
+def test_sdk_tokenizer_rejects_model_or_context_drift() -> None:
+    class Info:
+        model_key = "other"
+        context_length = 2048
+
+    class Model:
+        def get_info(self):
+            return Info()
+
+    with pytest.raises(TokenizerModelMismatch):
+        LMStudioSDKPromptTokenizer(
+            Model(), model_key="model", instance_id="instance", loaded_context=40960
         )

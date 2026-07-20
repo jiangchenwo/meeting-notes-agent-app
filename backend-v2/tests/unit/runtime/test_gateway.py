@@ -304,6 +304,7 @@ def test_provider_generation_occurs_only_in_approved_gateways_or_probe_script() 
     offenders: list[str] = []
     allowed = {
         ROOT / "src" / "notes_agent_v2" / "runtime" / "gateway.py",
+        ROOT / "src" / "notes_agent_v2" / "runtime" / "http_provider.py",
         ROOT / "src" / "notes_agent_v2" / "evaluation" / "judges.py",
         ROOT / "scripts" / "probe_lm_studio.py",
     }
@@ -346,8 +347,17 @@ def test_all_phase_one_profiles_are_candidate_and_fail_production_closed() -> No
         "narrative_reasoned",
         "tool_reasoned",
         "structured_off",
+        "evaluation_structured_off",
         "critic_structured_off",
+        "planning_reasoned",
+        "planning_structured_off",
     }
+    evaluation = catalog.resolve("evaluation_structured_off")
+    assert evaluation.max_tokens == 1024
+    assert catalog.resolve("planning_reasoned").max_tokens <= 1024
+    assert catalog.resolve("planning_reasoned").parse_retries == 1
+    assert catalog.resolve("planning_structured_off").max_tokens <= 1024
+    assert evaluation.parse_retries == 0
     for name in catalog.names:
         assert catalog.resolve(name).status == "candidate"
         with pytest.raises(RuntimeError, match="not production eligible"):

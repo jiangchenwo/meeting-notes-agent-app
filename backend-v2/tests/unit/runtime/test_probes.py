@@ -146,3 +146,126 @@ def test_probe_script_has_no_process_wide_expected_model_import() -> None:
         for alias in node.names
     }
     assert "EXPECTED_MODEL" not in imported_names
+
+
+def _load_probe_script():
+    script_path = Path(__file__).parents[3] / "scripts" / "probe_lm_studio.py"
+    spec = importlib.util.spec_from_file_location("probe_lm_studio_test", script_path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _live_runner(module):
+    return module.LiveProbeRunner(
+        base_url="http://runtime.test/v1",
+        model_key="model-key",
+        api_token=None,
+        timeout_seconds=1,
+        loaded_context=40960,
+    )
+
+
+def test_system_probe_disables_reasoning_for_exact_instruction_check() -> None:
+    module = _load_probe_script()
+    runner = _live_runner(module)
+    payloads: list[dict[str, object]] = []
+
+    def respond(payload):
+        payloads.append(payload)
+        instruction = payload["messages"][0]["content"]
+        return {"content": instruction.removeprefix("Reply with exactly ").removesuffix(".")}
+
+    runner._chat = respond
+
+    assert runner._system() == {"matched": True}
+    assert payloads[0]["reasoning_effort"] == "none"
+
+
+def test_reasoning_probe_reserves_enough_tokens_for_a_final_answer() -> None:
+    module = _load_probe_script()
+    runner = _live_runner(module)
+    payloads: list[dict[str, object]] = []
+
+    def respond(payload):
+        payloads.append(payload)
+        sentinel = payload["messages"][0]["content"].removeprefix("Reply with exactly ").removesuffix(".")
+        return {"content": sentinel, "reasoning_content": "reasoning observed"}
+
+    runner._chat = respond
+
+    assert runner._reasoning() == {"reasoning_observed": True}
+    assert payloads[0]["max_tokens"] == 512
+
+
+def test_reasoning_replay_reserves_enough_tokens_for_safe_final_content() -> None:
+    module = _load_probe_script()
+    runner = _live_runner(module)
+    payloads: list[dict[str, object]] = []
+
+    def respond(payload):
+        payloads.append(payload)
+        return {"content": "REPLAY-OK", "reasoning_content": "reasoning observed"}
+
+    runner._chat = respond
+
+    assert runner._reasoning_replay() == {"safe_final": True}
+    assert payloads[0]["max_tokens"] == 512
+
+
+def test_live_probe_trace_records_only_safe_exchange_metadata(monkeypatch) -> None:
+    module = _load_probe_script()
+    runner = _live_runner(module)
+
+    class Response:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self):
+            return {
+                "model": "model-key",
+                "choices": [
+                    {
+                        "finish_reason": "stop",
+                        "message": {
+                            "role": "assistant",
+                            "content": "PRIVATE RESPONSE",
+                            "reasoning_content": "PRIVATE REASONING",
+                        },
+                    }
+                ],
+                "usage": {"prompt_tokens": 5, "completion_tokens": 7, "total_tokens": 12},
+            }
+
+    class Client:
+        def __init__(self, **_kwargs) -> None:
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args) -> None:
+            return None
+
+        def post(self, *_args, **_kwargs):
+            return Response()
+
+    monkeypatch.setattr(module.httpx, "Client", Client)
+    runner._chat({"messages": [{"role": "user", "content": "PRIVATE PROMPT"}]})
+
+    serialized = str(runner.trace)
+    assert "PRIVATE PROMPT" not in serialized
+    assert "PRIVATE RESPONSE" not in serialized
+    assert "PRIVATE REASONING" not in serialized
+    assert runner.trace == [
+        {
+            "finish_reason": "stop",
+            "model": "model-key",
+            "prompt_tokens": 5,
+            "completion_tokens": 7,
+            "total_tokens": 12,
+            "reasoning_observed": True,
+            "tool_call_count": 0,
+        }
+    ]

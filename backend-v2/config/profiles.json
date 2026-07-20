@@ -44,6 +44,48 @@
       "status": "candidate"
     },
     {
+      "name": "evaluation_structured_off",
+      "reasoning": "off",
+      "output_mode": "structured",
+      "temperature": 0.2,
+      "top_p": 0.9,
+      "top_k": 40,
+      "max_tokens": 1024,
+      "parse_retries": 0,
+      "max_tool_rounds": 0,
+      "max_tool_calls": 0,
+      "max_tool_result_tokens": 0,
+      "status": "candidate"
+    },
+    {
+      "name": "planning_reasoned",
+      "reasoning": "reasoned",
+      "output_mode": "text",
+      "temperature": 0.4,
+      "top_p": 0.9,
+      "top_k": 40,
+      "max_tokens": 1024,
+      "parse_retries": 1,
+      "max_tool_rounds": 0,
+      "max_tool_calls": 0,
+      "max_tool_result_tokens": 0,
+      "status": "candidate"
+    },
+    {
+      "name": "planning_structured_off",
+      "reasoning": "off",
+      "output_mode": "structured",
+      "temperature": 0.2,
+      "top_p": 0.9,
+      "top_k": 40,
+      "max_tokens": 1024,
+      "parse_retries": 1,
+      "max_tool_rounds": 0,
+      "max_tool_calls": 0,
+      "max_tool_result_tokens": 0,
+      "status": "candidate"
+    },
+    {
       "name": "critic_structured_off",
       "reasoning": "off",
       "output_mode": "structured",

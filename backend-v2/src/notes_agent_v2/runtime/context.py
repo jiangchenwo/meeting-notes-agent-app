@@ -29,6 +29,12 @@ class PromptTokenizer(Protocol):
     def count_tokens(self, rendered_prompt: str) -> int: ...
 
 
+def get_loaded_lm_studio_model(client: Any) -> Any:
+    """Return LM Studio's current model without selecting or loading one."""
+
+    return client.llm.model()
+
+
 class ContextEnvelope(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -167,6 +173,45 @@ class LMStudioPromptTokenizer:
         close = getattr(self.client, "close", None)
         if callable(close):
             close()
+
+
+class LMStudioSDKPromptTokenizer:
+    exact = True
+
+    def __init__(
+        self,
+        model: Any,
+        *,
+        model_key: str,
+        instance_id: str,
+        loaded_context: int,
+    ) -> None:
+        try:
+            info = model.get_info()
+        except Exception as exc:
+            raise TokenizerModelMismatch("loaded tokenizer model metadata is unavailable") from exc
+        if (
+            getattr(info, "model_key", None) != model_key
+            or getattr(info, "context_length", None) != loaded_context
+        ):
+            raise TokenizerModelMismatch("tokenizer model identity or context drifted")
+        self.model = model
+        self.model_key = model_key
+        self.instance_id = instance_id
+
+    def render_chat(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
+        output_schema: dict[str, Any] | None = None,
+    ) -> str:
+        options: dict[str, Any] = {}
+        if tools:
+            options["toolDefinitions"] = tools
+        return self.model.apply_prompt_template({"messages": messages}, options)
+
+    def count_tokens(self, rendered_prompt: str) -> int:
+        return len(self.model.tokenize(rendered_prompt))
 
 
 class TokenEstimate(BaseModel):

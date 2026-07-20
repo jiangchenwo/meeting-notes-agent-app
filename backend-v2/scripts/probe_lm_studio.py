@@ -99,8 +99,21 @@ class LiveProbeRunner:
             )
             response.raise_for_status()
             data = response.json()
-        self.trace.append({"request": request_payload, "response": data})
-        return data["choices"][0]["message"]
+        choice = data["choices"][0]
+        message = choice["message"]
+        usage = data.get("usage") or {}
+        self.trace.append(
+            {
+                "finish_reason": choice.get("finish_reason"),
+                "model": data.get("model", self.model_key),
+                "prompt_tokens": int(usage.get("prompt_tokens", 0)),
+                "completion_tokens": int(usage.get("completion_tokens", 0)),
+                "total_tokens": int(usage.get("total_tokens", 0)),
+                "reasoning_observed": bool(message.get("reasoning_content")),
+                "tool_call_count": len(message.get("tool_calls") or []),
+            }
+        )
+        return message
 
     def _system(self) -> dict[str, Any]:
         sentinel = f"SYSTEM-{uuid4().hex[:8]}"
@@ -110,6 +123,7 @@ class LiveProbeRunner:
                     {"role": "system", "content": f"Reply with exactly {sentinel}."},
                     {"role": "user", "content": "Confirm."},
                 ],
+                "reasoning_effort": "none",
                 "temperature": 0,
                 "max_tokens": 64,
             }
@@ -124,7 +138,7 @@ class LiveProbeRunner:
             {
                 "messages": [{"role": "user", "content": f"Reply with exactly {sentinel}."}],
                 "temperature": 0,
-                "max_tokens": 128,
+                "max_tokens": 512,
             }
         )
         normalized = normalize_response({"message": message})
@@ -217,7 +231,7 @@ class LiveProbeRunner:
         message = self._chat(
             {
                 "messages": [{"role": "user", "content": "Reply with exactly REPLAY-OK."}],
-                "max_tokens": 128,
+                "max_tokens": 512,
             }
         )
         normalized = normalize_response({"message": message})
@@ -259,6 +273,7 @@ def main() -> int:
     parser.add_argument("--runtime-report", required=True, type=Path)
     parser.add_argument("--config", type=Path)
     parser.add_argument("--json-out", type=Path)
+    parser.add_argument("--authorization-out", type=Path)
     parser.add_argument("--trace-out", type=Path, default=DEFAULT_TRACE)
     args = parser.parse_args()
 
@@ -308,6 +323,12 @@ def main() -> int:
         args.json_out.write_text(rendered)
     else:
         print(rendered, end="")
+    if args.authorization_out:
+        authorization_out = require_private_trace_path(args.authorization_out)
+        authorization_out.parent.mkdir(parents=True, exist_ok=True)
+        authorization_out.write_text(
+            json.dumps(report.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
+        )
     return 0 if report.readiness.value == "ready" else 1
 
 
