@@ -94,7 +94,7 @@ _ROLE_PROFILES = {
     "verifier": frozenset({"structured_off"}),
     "audience": frozenset({"planning_reasoned", "planning_structured_off"}),
     "planner": frozenset({"planning_reasoned", "planning_structured_off"}),
-    "writer": frozenset({"tool_reasoned"}),
+    "writer": frozenset({"tool_reasoned", "narrative_reasoned", "structured_off"}),
     "critic": frozenset({"critic_structured_off"}),
     "reviser": frozenset({"tool_reasoned"}),
 }
@@ -107,6 +107,8 @@ _STAGE_PROFILES = {
     ("planner", "capability_analysis"): "planning_reasoned",
     ("planner", "capability_finalization"): "planning_structured_off",
     ("writer", "write"): "tool_reasoned",
+    ("writer", "write_narrative"): "narrative_reasoned",
+    ("writer", "write_structured"): "structured_off",
     ("critic", "critic"): "critic_structured_off",
     ("reviser", "revise"): "tool_reasoned",
 }

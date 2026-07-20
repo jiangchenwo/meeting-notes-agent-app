@@ -101,7 +101,7 @@ def test_dispatches_with_application_owned_profile_and_fresh_messages() -> None:
         ("extractor", "narrative_reasoned"),
         ("planner", "critic_structured_off"),
         ("critic", "tool_reasoned"),
-        ("writer", "structured_off"),
+        ("writer", "planning_structured_off"),
     ],
 )
 def test_rejects_role_profile_mismatches(role, profile) -> None:
@@ -129,6 +129,20 @@ def test_rejects_unknown_fields_and_role_tool_widening() -> None:
             )
         )
     assert not gateway.calls
+
+
+@pytest.mark.parametrize(
+    ("stage", "profile"),
+    [
+        ("write_narrative", "narrative_reasoned"),
+        ("write_structured", "structured_off"),
+    ],
+)
+def test_accepts_exact_writer_stage_profiles(stage, profile) -> None:
+    dispatcher, gateway, _ = _dispatcher()
+    dispatcher.dispatch(_request(stage=stage, profile_name=profile))
+    assert gateway.calls[0][0].stage == stage
+    assert gateway.calls[0][0].profile_name == profile
 
 
 def test_authorized_tools_are_resolved_from_closed_schemas() -> None:
